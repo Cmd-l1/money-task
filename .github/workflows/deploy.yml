@@ -1,0 +1,46 @@
+name: Publicar no GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      # A chave "publishable" é pública por design; a segurança vem das regras RLS do banco.
+      VITE_SUPABASE_URL: https://hvdsntlamtkrbuckhdvk.supabase.co
+      VITE_SUPABASE_PUBLISHABLE_KEY: sb_publishable_6NZSGB6GeINkrq5ym8dMYQ_GTkrHjP3
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-audit --no-fund
+      - name: Checagem de tipos (não bloqueia a publicação)
+        run: npx tsc --noEmit
+        continue-on-error: true
+      - run: npm run build
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

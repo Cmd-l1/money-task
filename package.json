@@ -1,0 +1,22 @@
+{
+  "name": "money-task",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "money task — PWA de tarefas, XP e educação financeira para famílias (TCC FURB Design)",
+  "scripts": {
+    "build": "node scripts/build.cjs",
+    "dev": "node scripts/build.cjs --serve",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "esbuild": "^0.25.0",
+    "typescript": "^5.6.0"
+  }
+}
