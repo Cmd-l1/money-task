@@ -63,7 +63,7 @@ function bal(db: DemoDB, id: string) {
 }
 function toChild(db: DemoDB, c: ChildRec): Child {
   const { balance, lifetime } = bal(db, c.id);
-  return { id: c.id, name: c.name, age: c.age, username: c.username, balance, lifetime, level: levelFor(lifetime), streak: c.streak };
+  return { id: c.id, name: c.name, age: c.age, username: c.username, balance, lifetime, level: levelFor(lifetime), streak: c.streak, lastActive: c.lastActive };
 }
 function rec(db: DemoDB, id: string): ChildRec {
   return db.children.find((c) => c.id === id) || fail('Perfil não encontrado.');

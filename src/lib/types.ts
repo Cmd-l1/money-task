@@ -17,6 +17,7 @@ export interface Child {
   lifetime: number; // XP acumulado em toda a vida
   level: number;
   streak: number;
+  lastActive?: string | null; // yyyy-mm-dd do último dia com tarefa aprovada
 }
 
 export type Repeat = 'once' | 'daily' | 'weekly';

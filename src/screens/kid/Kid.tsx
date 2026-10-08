@@ -40,7 +40,7 @@ export function KidHome() {
   const todo = tasks.filter((t) => t.state === 'todo' || t.state === 'rejected');
   const pending = tasks.filter((t) => t.state === 'pending').length;
   const next = rewards.find((r) => r.cost > me.balance);
-  const bigNotice = notice && (notice.kind === 'levelup' || notice.kind === 'achievement');
+  const bigNotice = notice && notice.kind !== 'rejected';
   const bannerNotice = notice && !bigNotice ? notice : null;
 
   return (
@@ -53,17 +53,12 @@ export function KidHome() {
             <span className="muted t-body">Vamos ganhar XP hoje?</span>
           </div>
         </div>
-        {me.streak > 0 && (
-          <Chip icon="flame">
-            {me.streak} {me.streak === 1 ? 'dia' : 'dias'}
-          </Chip>
-        )}
       </div>
 
       {bannerNotice && (
         <Alert
-          variant={bannerNotice.kind === 'approved' ? 'success' : 'destructive'}
-          icon={bannerNotice.kind === 'approved' ? 'check' : 'alert'}
+          variant="destructive"
+          icon="alert"
           title={bannerNotice.title}
           action={
             <button className="btn-ghost btn-sm btn" style={{ width: 'auto', color: 'inherit', minHeight: 32 }} onClick={() => api.dismissNotice(bannerNotice.id)} aria-label="Dispensar aviso">
@@ -80,29 +75,28 @@ export function KidHome() {
         </Alert>
       )}
 
-      <div className="card col" style={{ gap: 14 }}>
-        <div className="row between">
-          <div className="col" style={{ gap: 0 }}>
-            <span className="muted t-body">Seu saldo</span>
-            <div>
-              <span className="num-xl mint">{me.balance.toLocaleString('pt-BR')}</span> <b className="t-s">XP</b>
-            </div>
-          </div>
-          <div className="xp-bubble" style={{ width: 64, height: 64 }}>
-            XP
+      <div className="card row between">
+        <div className="col" style={{ gap: 2 }}>
+          <span className="muted t-body">Para gastar na loja</span>
+          <div>
+            <span className="num-xl mint">{me.balance.toLocaleString('pt-BR')}</span> <b className="t-s">XP</b>
           </div>
         </div>
-        <hr className="divider" />
+        <div className="xp-bubble" aria-hidden="true">
+          XP
+        </div>
+      </div>
+
+      <div className="card col" style={{ gap: 10 }}>
         <div className="row between">
           <b className="t-h">Nível {lp.level}</b>
-          <span className="muted t-cap">
-            {me.lifetime.toLocaleString('pt-BR')}
-            {lp.to ? ` / ${lp.to.toLocaleString('pt-BR')} XP` : ' XP'}
-          </span>
+          <span className="muted t-cap">Total ganho: {me.lifetime.toLocaleString('pt-BR')} XP</span>
         </div>
         <Progress pct={lp.pct} />
         <span className="muted t-cap">{lp.to ? `Faltam ${lp.missing.toLocaleString('pt-BR')} XP para o Nível ${lp.level + 1}` : 'Você chegou ao nível máximo!'}</span>
       </div>
+
+      <WeekStreak streak={me.streak} lastActive={me.lastActive} />
 
       <div className="row between">
         <h2 className="t-s">Tarefas de hoje</h2>
@@ -139,21 +133,83 @@ export function KidHome() {
   );
 }
 
+const DOW = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+function dayKeyOf(t: number) {
+  const d = new Date(t);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+function WeekStreak({ streak, lastActive }: { streak: number; lastActive?: string | null }) {
+  const DAY = 86400000;
+  const now = Date.now();
+  const today = dayKeyOf(now);
+  const alive = !!lastActive && (lastActive === today || lastActive === dayKeyOf(now - DAY));
+  const marked = new Set<string>();
+  if (alive && lastActive) {
+    const [y, m, d] = lastActive.split('-').map(Number);
+    const base = new Date(y, m - 1, d, 12).getTime();
+    for (let i = 0; i < streak; i++) marked.add(dayKeyOf(base - i * DAY));
+  }
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const t = now - (6 - i) * DAY;
+    return { key: dayKeyOf(t), label: DOW[new Date(t).getDay()], isToday: i === 6 };
+  });
+  const shown = alive ? streak : 0;
+  return (
+    <div className="card col" style={{ gap: 12 }} aria-label="Sequência de dias">
+      <div className="row between">
+        <div className="row" style={{ gap: 8 }}>
+          <span className={`flame ${shown > 0 ? 'on' : ''}`}>
+            <Icon name="flame" size={22} />
+          </span>
+          <b className="t-h">{shown > 0 ? `${shown} ${shown === 1 ? 'dia seguido' : 'dias seguidos'}` : 'Comece sua sequência'}</b>
+        </div>
+      </div>
+      <div className="week">
+        {days.map((d) => (
+          <div key={d.key} className={`wd ${marked.has(d.key) ? 'done' : ''} ${d.isToday ? 'today' : ''}`}>
+            <span className="dot">{marked.has(d.key) ? <Icon name="check" size={14} /> : null}</span>
+            <span className="lbl">{d.label}</span>
+          </div>
+        ))}
+      </div>
+      <span className="muted t-cap">{shown > 0 && lastActive !== today ? 'Conclua uma tarefa hoje para manter a sequência.' : shown > 0 ? 'Sequência garantida hoje!' : 'Conclua uma tarefa e acenda a chama.'}</span>
+    </div>
+  );
+}
+
+function Confetti() {
+  const colors = ['var(--primary)', 'var(--warning)', '#ffffff', '#5ad6ff'];
+  return (
+    <div className="confetti" aria-hidden="true">
+      {Array.from({ length: 18 }, (_, i) => (
+        <i key={i} style={{ left: `${(i * 37) % 100}%`, background: colors[i % colors.length], animationDelay: `${(i % 6) * 0.08}s`, animationDuration: `${1.4 + (i % 5) * 0.2}s` }} />
+      ))}
+    </div>
+  );
+}
+
 function NoticeSheet({ notice }: { notice: { id: string; kind: string; title: string; text: string } | null }) {
+  const approved = notice?.kind === 'approved';
   return (
     <Sheet open={!!notice} onClose={() => notice && api.dismissNotice(notice.id)}>
       {notice && (
         <>
-          <div className="tile lg icon-top">
-            <Icon name={notice.kind === 'levelup' ? 'star' : 'trophy'} size={30} />
+          <Confetti />
+          <div className="tile lg icon-top pop">
+            <Icon name={notice.kind === 'levelup' ? 'star' : approved ? 'check' : 'trophy'} size={30} />
           </div>
           <h2 className="t-m center" style={{ textAlign: 'center' }}>
-            {notice.title}
+            {approved ? 'Missão cumprida!' : notice.title}
           </h2>
+          {approved ? (
+            <p className="mint t-xl center" style={{ textAlign: 'center', margin: 0 }}>
+              {notice.text.split(' ').slice(0, 2).join(' ')}
+            </p>
+          ) : null}
           <p className="muted" style={{ textAlign: 'center' }}>
-            {notice.text}
+            {approved ? 'Seu responsável aprovou a tarefa. Continue assim!' : notice.text}
           </p>
-          <Button onClick={() => api.dismissNotice(notice.id)}>Legal!</Button>
+          <Button onClick={() => api.dismissNotice(notice.id)}>{approved ? 'Continuar' : 'Legal!'}</Button>
         </>
       )}
     </Sheet>

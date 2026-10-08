@@ -484,8 +484,15 @@ export function Approvals() {
   const { data: list } = useData(() => api.submissions('pending'));
   const [busy, setBusy] = useState<string | null>(null);
   const [okMsg, setOkMsg] = useState('');
+  const [zoom, setZoom] = useState<string | null>(null);
   return (
     <div className="screen">
+      {zoom && (
+        <div className="lightbox" role="dialog" aria-modal="true" onClick={() => setZoom(null)}>
+          <img src={zoom} alt="Foto enviada" />
+          <button onClick={() => setZoom(null)} aria-label="Fechar"><Icon name="x" size={22} /></button>
+        </div>
+      )}
       <TopBar title="Aprovações pendentes" onBack={() => navigate('/pai')} />
       {okMsg && <Alert variant="success" icon="check" title="Tarefa aprovada!">{okMsg}</Alert>}
       {!list ? <Loading /> : list.length === 0 ? (
@@ -499,7 +506,14 @@ export function Approvals() {
                 <div className="col grow" style={{ gap: 0 }}><b className="t-h">{s.task?.title}</b><span className="muted t-cap">{s.child?.name} · {when(s.createdAt)}</span></div>
                 <span className="badge">+{s.task?.xp} XP</span>
               </div>
-              {s.photo && <img className="photo" src={s.photo} alt="Foto enviada" />}
+              {s.photo ? (
+                <button className="photo-thumb" onClick={() => setZoom(s.photo!)} aria-label="Ver foto em tela cheia">
+                  <img src={s.photo} alt={`Foto enviada por ${s.child?.name}`} />
+                  <span className="zoom"><Icon name="eye" size={14} /> Ver foto</span>
+                </button>
+              ) : (
+                <span className="muted t-cap"><Icon name="info" size={13} /> Sem foto anexada</span>
+              )}
               <div className="row">
                 <Button variant="danger-outline" icon="x" onClick={() => navigate(`/pai/aprovacoes/${s.id}/recusar`)}>Recusar</Button>
                 <Button icon="check" disabled={busy === s.id} onClick={async () => { setBusy(s.id); const ok = await run(() => api.approve(s.id)); setBusy(null); if (ok) setOkMsg(`+${s.task?.xp} XP creditado para ${s.child?.name}.`); }}>Aprovar</Button>

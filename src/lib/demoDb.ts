@@ -43,6 +43,17 @@ export function dayKey(t = Date.now()): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+/** Foto de exemplo (caderno com exercícios) para a demonstração. */
+function samplePhoto(): string {
+  const svg =
+    '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" fill="#d9c9a8"/><rect x="70" y="30" width="500" height="360" rx="10" fill="#fbf8ef" stroke="#b9a883" stroke-width="3"/>' +
+    Array.from({ length: 9 }, (_, i) => `<line x1="100" y1="${90 + i * 32}" x2="540" y2="${90 + i * 32}" stroke="#bcd3e6" stroke-width="2"/>`).join('') +
+    '<text x="100" y="75" font-family="Georgia,serif" font-size="26" fill="#27406b">Lista de exercícios</text>' +
+    ['1) 12 × 8 = 96', '2) 3x + 5 = 20 → x = 5', '3) 45% de 200 = 90', '4) 7² − 9 = 40'].map((t, i) => `<text x="110" y="${118 + i * 64}" font-family="Georgia,serif" font-size="24" fill="#2b3f6d">${t}</text>`).join('') +
+    '<text x="320" y="408" text-anchor="middle" font-family="sans-serif" font-size="14" fill="#6b5f46">foto de exemplo da demonstração</text></svg>';
+  return 'data:image/svg+xml;utf8,' + encodeURIComponent(svg);
+}
+
 function seed(): DemoDB {
   const now = Date.now();
   const n = (i: number) => `d${i}`;
@@ -65,7 +76,7 @@ function seed(): DemoDB {
       { id: 't6', title: 'Arrumar o quarto', description: 'Roupas guardadas e mesa limpa.', xp: 150, childId: 'c-pedro', repeat: 'weekly', needsPhoto: false, icon: 'home', active: true },
     ],
     submissions: [
-      { id: 's1', taskId: 't1', childId: 'c-lucas', status: 'pending', createdAt: now - 3600000 },
+      { id: 's1', taskId: 't1', childId: 'c-lucas', status: 'pending', photo: samplePhoto(), createdAt: now - 3600000 },
       { id: 's2', taskId: 't4', childId: 'c-mari', status: 'approved', createdAt: now - DAY, decidedAt: now - DAY + 600000 },
     ],
     rewards: [
