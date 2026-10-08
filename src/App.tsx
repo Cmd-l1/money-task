@@ -1,8 +1,8 @@
 import { useEffect, useState, useSyncExternalStore, type ReactElement } from 'react';
-import { api, getSession, getVersion, subscribe } from './lib/api';
+import { api, bump, getSession, getVersion, subscribe } from './lib/api';
 import { matchRoute, navigate, usePath, type Params } from './lib/router';
 import { ToastHost } from './ui/kit';
-import { About, AllSet, ChildLogin, Consent, DemoPicker, FamilyInfo, Forgot, ForgotSent, Goal, ParentLogin, ParentSignup } from './screens/auth/Auth';
+import { About, AllSet, ChildLogin, ConfirmEmail, Consent, DemoPicker, NewPassword, FamilyInfo, Forgot, ForgotSent, Goal, ParentLogin, ParentSignup } from './screens/auth/Auth';
 import { KidAchievements, KidDoTask, KidHome, KidProfile, KidRedeemed, KidSent, KidShop, KidStatement } from './screens/kid/Kid';
 import { Learn, Lesson, Quiz, QuizResultScreen, Review } from './screens/kid/Learn';
 import { AddMember, Approvals, EditMember, FollowChild, Members, ParentHome, ParentProfile, ParentRewards, ParentTasks, Privacy, Reject, Reports, RewardForm, TaskForm } from './screens/parent/Parent';
@@ -17,6 +17,8 @@ const ROUTES: { path: string; access: Access; render: (p: Params) => ReactElemen
   { path: '/pronto', access: 'public', render: () => <AllSet /> },
   { path: '/esqueci', access: 'public', render: () => <Forgot /> },
   { path: '/esqueci/enviado', access: 'public', render: () => <ForgotSent /> },
+  { path: '/confirme-email', access: 'public', render: () => <ConfirmEmail /> },
+  { path: '/nova-senha', access: 'public', render: () => <NewPassword /> },
   { path: '/filho/entrar', access: 'public', render: () => <ChildLogin /> },
   { path: '/demo', access: 'public', render: () => <DemoPicker /> },
   { path: '/sobre', access: 'public', render: () => <About /> },
@@ -71,6 +73,18 @@ export function App() {
   }, []);
 
   const s = getSession();
+  // contas reais: atualiza os dados de tempos em tempos e quando o app volta para a tela
+  const isReal = s?.mode === 'real';
+  useEffect(() => {
+    if (!isReal) return;
+    const tick = () => document.visibilityState === 'visible' && navigator.onLine && bump();
+    const id = setInterval(tick, 30000);
+    document.addEventListener('visibilitychange', tick);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener('visibilitychange', tick);
+    };
+  }, [isReal]);
   let content: ReactElement | null = null;
   let redirect: string | null = null;
 
@@ -96,7 +110,7 @@ export function App() {
       {s?.mode === 'demo' && (
         <div className="demo-bar">
           <span>Modo demonstração · dados fictícios</span>
-          <button onClick={() => { api.logout(); navigate('/entrar', true); }}>Sair</button>
+          <button onClick={() => { void api.logout(); navigate('/entrar', true); }}>Sair</button>
         </div>
       )}
       {content}

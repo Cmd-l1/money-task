@@ -663,7 +663,7 @@ export function KidProfile() {
         <div className="tile lg danger icon-top"><Icon name="logout" size={26} /></div>
         <h2 className="t-m" style={{ textAlign: 'center' }}>Sair da conta?</h2>
         <p className="muted" style={{ textAlign: 'center' }}>Para entrar de novo, você vai precisar do usuário e da senha.</p>
-        <Button variant="danger" onClick={() => { api.logout(); navigate('/filho/entrar', true); }}>Sair</Button>
+        <Button variant="danger" onClick={async () => { await api.logout(); navigate('/filho/entrar', true); }}>Sair</Button>
         <Button variant="outline" onClick={() => setOut(false)}>Cancelar</Button>
       </Sheet>
     </KidLayout>

@@ -1,11 +1,14 @@
 import { useState } from 'react';
-import { api } from '../../lib/api';
+import { api, getSession, sbConfigured } from '../../lib/api';
 import { navigate } from '../../lib/router';
 import { Alert, Button, Field, PasswordInput, TextInput, TopBar, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 
-// Contas reais (Supabase) entram na próxima etapa. Enquanto isso, a demonstração mostra todo o app.
-const REAL_ACCOUNTS = false;
+// Contas reais (Supabase) ficam ativas quando o build recebe o endereço e a chave do projeto.
+const REAL_ACCOUNTS = sbConfigured;
+
+// Dados do cadastro em andamento (a senha fica só na memória, nunca no armazenamento do navegador).
+let signupDraft: { name: string; email: string; pass: string } | null = null;
 
 const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
 
@@ -14,15 +17,28 @@ export function ParentLogin() {
   const [pass, setPass] = useState('');
   const [err, setErr] = useState<{ email?: string; pass?: string }>({});
 
-  const submit = () => {
+  const [busy, setBusy] = useState(false);
+  const [formErr, setFormErr] = useState('');
+
+  const submit = async () => {
     const e: typeof err = {};
     if (!emailOk(email)) e.email = 'Digite um e-mail válido.';
     if (pass.length < 1) e.pass = 'Digite sua senha.';
     setErr(e);
+    setFormErr('');
     if (Object.keys(e).length) return;
     if (!REAL_ACCOUNTS) {
       toast('Contas reais ainda não estão ativas. Explore a demonstração.', 'error');
       return;
+    }
+    setBusy(true);
+    try {
+      await api.loginParent(email, pass);
+      navigate('/pai', true);
+    } catch (x) {
+      setFormErr(x instanceof Error ? x.message : 'Não foi possível entrar.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -39,16 +55,21 @@ export function ParentLogin() {
         </Alert>
       )}
       <div className="card col gap-16" style={{ padding: 20 }}>
+        {formErr && (
+          <Alert variant="destructive" icon="alert" title="Não foi possível entrar">
+            {formErr}
+          </Alert>
+        )}
         <Field label="E-mail" error={err.email}>
           <TextInput type="email" inputMode="email" autoComplete="email" placeholder="seuemail@exemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} invalid={!!err.email} />
         </Field>
         <Field label="Senha" error={err.pass}>
-          <PasswordInput autoComplete="current-password" placeholder="Sua senha" value={pass} onChange={(e) => setPass(e.target.value)} />
+          <PasswordInput autoComplete="current-password" placeholder="Sua senha" value={pass} onChange={(e) => setPass(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
         </Field>
         <a className="link" href="#/esqueci" style={{ textAlign: 'right' }}>
           Esqueci minha senha
         </a>
-        <Button onClick={submit}>Entrar</Button>
+        <Button disabled={busy} onClick={submit}>{busy ? 'Entrando…' : 'Entrar'}</Button>
         <Button variant="outline" icon="play" onClick={() => navigate('/demo')}>
           Explorar modo demonstração
         </Button>
@@ -76,7 +97,7 @@ export function ParentSignup() {
     if (f.pass2 !== f.pass) e.pass2 = 'As senhas não coincidem.';
     setErr(e);
     if (Object.keys(e).length) return;
-    sessionStorage.setItem('mt-signup', JSON.stringify({ name: f.name.trim(), email: f.email.trim() }));
+    signupDraft = { name: f.name.trim(), email: f.email.trim(), pass: f.pass };
     navigate('/lgpd');
   };
 
@@ -114,6 +135,23 @@ export function ParentSignup() {
 
 export function Consent() {
   const [ok, setOk] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const accept = async () => {
+    setErr('');
+    if (!REAL_ACCOUNTS) return navigate('/objetivo');
+    if (!signupDraft) return navigate('/cadastro', true);
+    setBusy(true);
+    try {
+      const r = await api.signupParent({ name: signupDraft.name, email: signupDraft.email, password: signupDraft.pass });
+      signupDraft = null;
+      navigate(r.confirm ? '/confirme-email' : '/objetivo', true);
+    } catch (x) {
+      setErr(x instanceof Error ? x.message : 'Não foi possível criar a conta.');
+    } finally {
+      setBusy(false);
+    }
+  };
   return (
     <div className="screen pad-bottom-actions">
       <TopBar title="Privacidade e consentimento" />
@@ -141,15 +179,21 @@ export function Consent() {
         <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} style={{ width: 22, height: 22, accentColor: '#6ceba8', marginTop: 2 }} />
         <span className="t-body">Sou o responsável legal e autorizo o tratamento dos dados dos meus filhos para o uso do app.</span>
       </label>
+      {err && (
+        <Alert variant="destructive" icon="alert" title="Não foi possível criar a conta">
+          {err} <a href="#/cadastro">Voltar ao cadastro</a>
+        </Alert>
+      )}
       <div className="footer-actions">
-        <Button disabled={!ok} onClick={() => navigate('/objetivo')}>
-          Aceitar e continuar
+        <Button disabled={!ok || busy} onClick={accept}>
+          {busy ? 'Criando sua conta…' : 'Aceitar e continuar'}
         </Button>
       </div>
     </div>
   );
 }
 
+let onboardGoals: string[] = [];
 export function Goal() {
   const [sel, setSel] = useState<string[]>([]);
   const opts = ['Criar bons hábitos', 'Ajudar nas tarefas de casa', 'Ensinar a lidar com dinheiro', 'Incentivar os estudos'];
@@ -170,8 +214,8 @@ export function Goal() {
         ))}
       </div>
       <div className="footer-actions">
-        <Button onClick={() => navigate('/sobre-familia')}>Continuar</Button>
-        <Button variant="ghost" onClick={() => navigate('/sobre-familia')}>
+        <Button onClick={() => { onboardGoals = sel; navigate('/sobre-familia'); }}>Continuar</Button>
+        <Button variant="ghost" onClick={() => { onboardGoals = []; navigate('/sobre-familia'); }}>
           Pular
         </Button>
       </div>
@@ -192,8 +236,8 @@ export function FamilyInfo() {
         <TextInput inputMode="numeric" placeholder="Ex.: 2" value={n} onChange={(e) => setN(e.target.value.replace(/\D/g, '').slice(0, 2))} />
       </Field>
       <div className="footer-actions">
-        <Button onClick={() => navigate('/pronto')}>Continuar</Button>
-        <Button variant="ghost" onClick={() => navigate('/pronto')}>
+        <Button onClick={() => { if (getSession()?.mode === 'real') void api.saveOnboarding({ goals: onboardGoals, kids_expected: n || null }); navigate('/pronto'); }}>Continuar</Button>
+        <Button variant="ghost" onClick={() => { if (getSession()?.mode === 'real' && onboardGoals.length) void api.saveOnboarding({ goals: onboardGoals }); navigate('/pronto'); }}>
           Pular
         </Button>
       </div>
@@ -213,14 +257,23 @@ export function AllSet() {
         <h1 className="t-l">Tudo pronto!</h1>
         <p className="muted">Sua conta está criada. Agora adicione o primeiro membro da família.</p>
       </div>
-      <Alert variant="warning" icon="info" title="Contas reais em breve">
-        Nesta versão, o cadastro ainda não é gravado. Explore a demonstração para ver como tudo funciona.
-      </Alert>
+      {!(REAL_ACCOUNTS && getSession()?.mode === 'real') && (
+        <Alert variant="warning" icon="info" title="Contas reais em breve">
+          Nesta versão, o cadastro ainda não é gravado. Explore a demonstração para ver como tudo funciona.
+        </Alert>
+      )}
       <div className="footer-actions">
-        <Button onClick={() => navigate('/demo')}>Explorar a demonstração</Button>
-        <Button variant="outline" onClick={() => navigate('/entrar')}>
-          Voltar ao login
-        </Button>
+        {REAL_ACCOUNTS && getSession()?.mode === 'real' ? (
+          <Button icon="plus" onClick={() => navigate('/pai/membros/novo', true)}>Adicionar primeiro membro</Button>
+        ) : (
+          <>
+            <Button onClick={() => navigate('/demo')}>Explorar a demonstração</Button>
+            <Button variant="outline" onClick={() => navigate('/entrar')}>
+              Voltar ao login
+            </Button>
+          </>
+        )}
+        {REAL_ACCOUNTS && getSession()?.mode === 'real' && <Button variant="ghost" onClick={() => navigate('/pai', true)}>Ir para o início</Button>}
       </div>
     </div>
   );
@@ -229,6 +282,7 @@ export function AllSet() {
 export function Forgot() {
   const [email, setEmail] = useState('');
   const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
   return (
     <div className="screen pad-bottom-actions">
       <TopBar title="Esqueci minha senha" />
@@ -244,13 +298,25 @@ export function Forgot() {
       </Alert>
       <div className="footer-actions">
         <Button
-          onClick={() => {
+          disabled={busy}
+          onClick={async () => {
             if (!emailOk(email)) return setErr('Digite um e-mail válido.');
+            setErr('');
             sessionStorage.setItem('mt-reset-email', email.trim());
+            if (REAL_ACCOUNTS) {
+              setBusy(true);
+              try {
+                await api.forgotPassword(email);
+              } catch (x) {
+                setBusy(false);
+                return setErr(x instanceof Error ? x.message : 'Não foi possível enviar o e-mail.');
+              }
+              setBusy(false);
+            }
             navigate('/esqueci/enviado');
           }}
         >
-          Enviar link
+          {busy ? 'Enviando…' : 'Enviar link'}
         </Button>
       </div>
     </div>
@@ -269,14 +335,27 @@ export function ForgotSent() {
         </div>
         <h1 className="t-l">Confira seu e-mail</h1>
         <p className="muted">
-          Enviaríamos o link para <b>{email}</b>. Ele valeria por 1 hora.
+          {REAL_ACCOUNTS ? <>Se existir uma conta com <b>{email}</b>, enviamos um link para criar uma nova senha. Ele vale por 1 hora. Veja também a caixa de spam.</> : <>Enviaríamos o link para <b>{email}</b>. Ele valeria por 1 hora.</>}
         </p>
       </div>
-      <Alert variant="warning" icon="info" title="Recurso das contas reais">
-        O envio de e-mails será ativado junto com as contas reais.
-      </Alert>
+      {!REAL_ACCOUNTS && (
+        <Alert variant="warning" icon="info" title="Recurso das contas reais">
+          O envio de e-mails será ativado junto com as contas reais.
+        </Alert>
+      )}
       <div className="footer-actions">
-        <Button variant="outline" onClick={() => toast('Link reenviado (simulação).')}>
+        <Button
+          variant="outline"
+          onClick={async () => {
+            if (!REAL_ACCOUNTS) return toast('Link reenviado (simulação).');
+            try {
+              await api.forgotPassword(email);
+              toast('Link reenviado.');
+            } catch (x) {
+              toast(x instanceof Error ? x.message : 'Não foi possível reenviar.', 'error');
+            }
+          }}
+        >
           Reenviar link
         </Button>
         <Button onClick={() => navigate('/entrar')}>Voltar ao login</Button>
@@ -289,14 +368,19 @@ export function ChildLogin() {
   const [u, setU] = useState('');
   const [p, setP] = useState('');
   const [error, setError] = useState('');
+  const [busy, setBusy] = useState(false);
   const submit = async () => {
     setError('');
     if (!u.trim() || !p) return setError('Digite seu usuário e sua senha.');
+    setBusy(true);
     try {
-      api.loginChild(u, p);
+      await api.loginChild(u, p);
       navigate('/filho', true);
-    } catch {
-      setError('Usuário ou senha incorretos. Confira com seu responsável.');
+    } catch (x) {
+      const m = x instanceof Error ? x.message : '';
+      setError(/conex|servidor|Muitas/.test(m) ? m : 'Usuário ou senha incorretos. Confira com seu responsável.');
+    } finally {
+      setBusy(false);
     }
   };
   return (
@@ -317,7 +401,7 @@ export function ChildLogin() {
         <Field label="Senha">
           <PasswordInput autoComplete="current-password" placeholder="Sua senha" value={p} onChange={(e) => setP(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
         </Field>
-        <Button onClick={submit}>Entrar</Button>
+        <Button disabled={busy} onClick={submit}>{busy ? 'Entrando…' : 'Entrar'}</Button>
         <p className="sep-text muted t-cap">Seu usuário e senha foram criados pelo seu responsável. Esqueceu? Peça a ele para redefinir.</p>
         <Alert variant="promo" icon="info" title="Testando a demonstração?">
           Use <b>lucas14</b> e senha <b>lucas123</b> (14 anos) ou <b>pedro17</b> e <b>pedro123</b> (17 anos, com educação financeira).
@@ -325,6 +409,66 @@ export function ChildLogin() {
         <p className="sep-text muted t-cap">
           É pai, mãe ou responsável? <a href="#/entrar">Entrar aqui</a>
         </p>
+      </div>
+    </div>
+  );
+}
+
+export function ConfirmEmail() {
+  return (
+    <div className="screen pad-bottom-actions">
+      <div className="hero" style={{ paddingTop: 80 }}>
+        <div className="halo">
+          <div>
+            <Icon name="mail" size={40} />
+          </div>
+        </div>
+        <h1 className="t-l">Confirme seu e-mail</h1>
+        <p className="muted">Enviamos um link de confirmação para o seu e-mail. Toque nele para ativar a conta e depois entre aqui. Veja também a caixa de spam.</p>
+      </div>
+      <div className="footer-actions">
+        <Button onClick={() => navigate('/entrar')}>Ir para o login</Button>
+      </div>
+    </div>
+  );
+}
+
+export function NewPassword() {
+  const [p1, setP1] = useState('');
+  const [p2, setP2] = useState('');
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  const save = async () => {
+    if (p1.length < 8) return setErr('A senha precisa de no mínimo 8 caracteres.');
+    if (p1 !== p2) return setErr('As senhas não coincidem.');
+    setErr('');
+    setBusy(true);
+    try {
+      await api.setNewPassword(p1);
+      toast('Senha alterada.');
+      navigate('/pai', true);
+    } catch (x) {
+      setErr(x instanceof Error ? x.message : 'Não foi possível salvar.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="screen pad-bottom-actions">
+      <TopBar title="Nova senha" onBack={() => navigate('/entrar')} />
+      <div className="col">
+        <h2 className="t-l">Crie uma nova senha</h2>
+        <p className="muted">Use pelo menos 8 caracteres.</p>
+      </div>
+      {err && <Alert variant="destructive" icon="alert" title="Atenção">{err}</Alert>}
+      <Field label="Nova senha">
+        <PasswordInput autoComplete="new-password" value={p1} onChange={(e) => setP1(e.target.value)} />
+      </Field>
+      <Field label="Confirmar nova senha">
+        <PasswordInput autoComplete="new-password" value={p2} onChange={(e) => setP2(e.target.value)} />
+      </Field>
+      <div className="footer-actions">
+        <Button disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar nova senha'}</Button>
       </div>
     </div>
   );

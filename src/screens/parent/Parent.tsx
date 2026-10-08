@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from 'react';
-import { api } from '../../lib/api';
+import { api, getSession } from '../../lib/api';
 import { navigate, currentQuery } from '../../lib/router';
 import { Alert, BottomNav, Button, Chip, Empty, Field, Loading, PasswordInput, Progress, Sheet, Switch, TextInput, TopBar, run, toast, useData, when, xpText, type NavItem } from '../../ui/kit';
 import { Icon, REWARD_ICONS } from '../../ui/Icon';
@@ -551,15 +551,18 @@ export function Reject({ id }: { id: string }) {
 // ---------- perfil e extras ----------
 export function ParentProfile() {
   const [out, setOut] = useState(false);
+  const real = getSession()?.mode === 'real';
+  const { data: pname } = useData(() => api.parentName());
+  const { data: pemail } = useData(() => api.parentEmail());
   const row = (icon: string, label: string, path: string) => (
     <button className="list-item" onClick={() => navigate(path)}><div className="tile dark sm"><Icon name={icon} size={18} /></div><span className="label">{label}</span><Icon name="chevron" size={16} className="dim" /></button>
   );
   return (
     <ParentLayout active="perfil">
       <div className="hero" style={{ paddingTop: 8 }}>
-        <div className="avatar xl ring">R</div>
-        <h1 className="t-l">Responsável</h1>
-        <span className="muted">Modo demonstração</span>
+        <div className="avatar xl ring">{(real && pname ? pname[0] : 'R').toUpperCase()}</div>
+        <h1 className="t-l">{real && pname ? pname : 'Responsável'}</h1>
+        <span className="muted">{real ? pemail || 'Conta do responsável' : 'Modo demonstração'}</span>
       </div>
       <div className="card menu">
         {row('shield', 'Privacidade e dados', '/pai/privacidade')}
@@ -567,12 +570,12 @@ export function ParentProfile() {
         {row('info', 'Sobre o money task', '/sobre')}
       </div>
       <InstallBanner />
-      <Button variant="outline" icon="refresh" onClick={() => { api.resetDemo(); toast('Demonstração reiniciada.'); }}>Reiniciar dados da demonstração</Button>
+      {!real && <Button variant="outline" icon="refresh" onClick={() => { api.resetDemo(); toast('Demonstração reiniciada.'); }}>Reiniciar dados da demonstração</Button>}
       <Button variant="danger-outline" icon="logout" onClick={() => setOut(true)}>Sair</Button>
       <Sheet open={out} onClose={() => setOut(false)}>
         <div className="tile lg danger icon-top"><Icon name="logout" size={26} /></div>
         <h2 className="t-m" style={{ textAlign: 'center' }}>Sair da conta?</h2>
-        <Button variant="danger" onClick={() => { api.logout(); navigate('/entrar', true); }}>Sair</Button>
+        <Button variant="danger" onClick={async () => { await api.logout(); navigate('/entrar', true); }}>Sair</Button>
         <Button variant="outline" onClick={() => setOut(false)}>Cancelar</Button>
       </Sheet>
     </ParentLayout>
@@ -581,6 +584,7 @@ export function ParentProfile() {
 
 export function Privacy() {
   const [del, setDel] = useState(false);
+  const [busyDel, setBusyDel] = useState(false);
   const download = async () => {
     const json = await api.exportData();
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
@@ -605,7 +609,7 @@ export function Privacy() {
         <div className="tile lg danger icon-top"><Icon name="trash" size={26} /></div>
         <h2 className="t-m" style={{ textAlign: 'center' }}>Excluir conta?</h2>
         <p className="muted" style={{ textAlign: 'center' }}>Todos os dados da família serão apagados e não poderão ser recuperados.</p>
-        <Button variant="danger" onClick={() => { api.resetDemo(); api.logout(); navigate('/entrar', true); }}>Excluir tudo</Button>
+        <Button variant="danger" disabled={busyDel} onClick={async () => { setBusyDel(true); const ok = await run(() => api.deleteAccount()); setBusyDel(false); if (ok) navigate('/entrar', true); }}>{busyDel ? 'Excluindo…' : 'Excluir tudo'}</Button>
         <Button variant="outline" onClick={() => setDel(false)}>Cancelar</Button>
       </Sheet>
     </div>

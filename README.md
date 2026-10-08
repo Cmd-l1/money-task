@@ -5,7 +5,7 @@ Projeto de conclusão de curso — Design, FURB.
 
 - **App:** https://cmd-l1.github.io/money-task/
 - **Pilha:** React 19 + TypeScript, esbuild, CSS próprio (tokens espelham o design system shadcn do Figma), PWA instalável.
-- **Dados:** modo demonstração local (já funciona) e Supabase (contas reais, próxima etapa).
+- **Dados:** modo demonstração local e Supabase (contas reais; veja `supabase/LEIA-ME.md`).
 
 ## Rodar localmente
 
