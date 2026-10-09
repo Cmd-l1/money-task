@@ -1,6 +1,6 @@
 // Modo demonstração: tudo local (localStorage), sem enviar dados a nenhum servidor.
 import { EDU } from '../data/edu';
-import { dayKey, loadDb, nextId, resetDb, saveDb, type ChildRec, type DemoDB, type Notice } from './demoDb';
+import { dayKey, loadDb as rawLoad, nextId, resetDb, saveDb, type ChildRec, type DemoDB, type Notice } from './demoDb';
 import { taskIcon } from '../ui/Icon';
 import { EDU_MIN_AGE, MODULE_XP, PASS_RATIO, levelFor } from './xp';
 import { ACH } from './ach';
@@ -8,6 +8,35 @@ import { bump, fail, getSession, setSession } from './core';
 import type { Achievement, Child, EduModule, LedgerEntry, ModuleStatus, QuizResult, Redemption, Reward, Session, Submission, Task } from './types';
 
 const DAY = 86400000;
+
+export const WELCOME_TITLE = 'Conheça o money task';
+export const WELCOME_DESC = 'Navegue por todo o aplicativo: início, tarefas, loja, conquistas e perfil. Depois toque em Concluir.';
+
+// perda de XP por prazo vencido: roda sempre que os dados são lidos, uma vez por tarefa e membro
+function applyPenalties(db: DemoDB) {
+  const now = Date.now();
+  let changed = false;
+  const done = (db.penalized = db.penalized || []);
+  for (const t of db.tasks) {
+    if (!t.active || !t.dueAt || t.dueAt > now || !(t.penalty && t.penalty > 0)) continue;
+    const targets = t.childId === 'all' ? db.children.map((c) => c.id) : [t.childId];
+    for (const cid of targets) {
+      const key = `${t.id}:${cid}`;
+      if (done.includes(key)) continue;
+      if (db.submissions.some((s) => s.taskId === t.id && s.childId === cid && (s.status === 'pending' || s.status === 'approved'))) continue;
+      const cut = Math.max(0, Math.min(t.penalty, bal(db, cid).balance));
+      done.push(key);
+      if (cut > 0) db.ledger.push({ id: nextId(db, 'l'), childId: cid, delta: -cut, reason: `Prazo perdido: ${t.title}`, createdAt: Math.max(t.dueAt, now - 1) });
+      changed = true;
+    }
+  }
+  if (changed) saveDb();
+}
+function loadDb(): DemoDB {
+  const db = rawLoad();
+  applyPenalties(db);
+  return db;
+}
 
 // ---------- cálculos ----------
 function bal(db: DemoDB, id: string) {
@@ -74,6 +103,13 @@ export interface KidTask {
   task: Task;
   state: TaskState;
   submission?: Submission;
+  partners?: { name: string; done: boolean; me: boolean }[]; // tarefa conjunta
+}
+function partnersOf(db: DemoDB, t: Task): KidTask['partners'] {
+  if (!t.groupId) return undefined;
+  return db.tasks
+    .filter((x) => x.active && x.groupId === t.groupId)
+    .map((x) => ({ name: db.children.find((c) => c.id === x.childId)?.name || '—', me: x.id === t.id, done: db.submissions.some((s) => s.taskId === x.id && s.status === 'approved') }));
 }
 function taskState(db: DemoDB, task: Task, childId: string): { state: TaskState; submission?: Submission } {
   const subs = db.submissions.filter((s) => s.taskId === task.id && s.childId === childId).sort((a, b) => b.createdAt - a.createdAt);
@@ -91,7 +127,7 @@ function taskState(db: DemoDB, task: Task, childId: string): { state: TaskState;
 }
 function myId(): string {
   const s = getSession();
-  if (!s || s.role !== 'kid' || !s.childId) return fail('Entre como filho para continuar.');
+  if (!s || s.role !== 'kid' || !s.childId) return fail('Entre como membro para continuar.');
   return s.childId;
 }
 const assigned = (db: DemoDB, childId: string) => db.tasks.filter((t) => t.active && (t.childId === childId || t.childId === 'all'));
@@ -126,19 +162,20 @@ export const demoApi = {
   async myTasks(): Promise<KidTask[]> {
     const db = loadDb();
     const id = myId();
-    return assigned(db, id).map((t) => ({ task: t, ...taskState(db, t, id) }));
+    return assigned(db, id).map((t) => ({ task: t, ...taskState(db, t, id), partners: partnersOf(db, t) }));
   },
   async myTask(taskId: string): Promise<KidTask> {
     const db = loadDb();
     const id = myId();
     const t = db.tasks.find((x) => x.id === taskId) || fail('Tarefa não encontrada.');
-    return { task: t, ...taskState(db, t, id) };
+    return { task: t, ...taskState(db, t, id), partners: partnersOf(db, t) };
   },
   async submitTask(taskId: string, photo?: string) {
     const db = loadDb();
     const id = myId();
     const t = db.tasks.find((x) => x.id === taskId) || fail('Tarefa não encontrada.');
     const st = taskState(db, t, id);
+    if (t.dueAt && Date.now() > t.dueAt) fail('O prazo desta tarefa já passou.');
     if (st.state === 'pending') fail('Essa tarefa já foi enviada.');
     if (st.state === 'done') fail('Você já concluiu essa tarefa.');
     if (t.needsPhoto && !photo) fail('Esta tarefa precisa de uma foto como prova.');
@@ -149,7 +186,7 @@ export const demoApi = {
   async myRewards(): Promise<Reward[]> {
     const db = loadDb();
     const id = myId();
-    return db.rewards.filter((r) => r.active && (r.childId === id || r.childId === 'all')).sort((a, b) => a.cost - b.cost);
+    return db.rewards.filter((r) => r.active && (!r.expiresAt || r.expiresAt > Date.now()) && (r.childId === id || r.childId === 'all')).sort((a, b) => a.cost - b.cost);
   },
   async reward(rewardId: string): Promise<Reward> {
     return loadDb().rewards.find((r) => r.id === rewardId) || fail('Recompensa não encontrada.');
@@ -158,6 +195,7 @@ export const demoApi = {
     const db = loadDb();
     const id = myId();
     const r = db.rewards.find((x) => x.id === rewardId) || fail('Recompensa não encontrada.');
+    if (r.expiresAt && Date.now() > r.expiresAt) fail('O prazo desta recompensa já acabou.');
     const { balance } = bal(db, id);
     if (balance < r.cost) fail('XP insuficiente.');
     withProgress(db, id, () => {
@@ -278,13 +316,14 @@ export const demoApi = {
     const db = loadDb();
     const name = input.name.trim();
     const username = input.username.trim().toLowerCase();
-    if (!name) fail('Informe o nome do filho(a).');
+    if (!name) fail('Informe o nome do membro.');
     if (!(input.age >= 7 && input.age <= 18)) fail('A idade deve ser entre 7 e 18 anos.');
     if (!/^[a-z0-9._]{3,20}$/.test(username)) fail('O usuário deve ter de 3 a 20 letras minúsculas, números, ponto ou _ (sem espaços).');
     if (db.children.some((c) => c.username === username)) fail('Esse usuário já está em uso. Escolha outro.');
     if (input.password.length < 6) fail('A senha deve ter no mínimo 6 caracteres.');
     const c: ChildRec = { id: nextId(db, 'c'), name, age: input.age, username, password: input.password, streak: 0, bestStreak: 0, lastActive: null };
     db.children.push(c);
+    db.tasks.push({ id: nextId(db, 't'), title: WELCOME_TITLE, description: WELCOME_DESC, xp: 50, childId: c.id, repeat: 'once', needsPhoto: false, icon: 'star', active: true });
     saveDb();
     bump();
     return toChild(db, c);
@@ -329,17 +368,23 @@ export const demoApi = {
   async task(id: string): Promise<Task> {
     return loadDb().tasks.find((t) => t.id === id) || fail('Tarefa não encontrada.');
   },
-  async saveTask(input: Partial<Task> & { title: string; xp: number; childId: string }) {
+  async saveTask(input: Partial<Task> & { title: string; xp: number; childId: string; childIds?: string[]; joint?: boolean }) {
     const db = loadDb();
     const title = input.title.trim();
     if (!title) fail('Informe o título da tarefa.');
     if (!(input.xp > 0 && input.xp <= 5000)) fail('O XP deve ser um número entre 1 e 5000.');
-    if (!input.childId) fail('Escolha para quem é a tarefa.');
+    const repeat = input.repeat ?? 'daily';
+    const dueAt = repeat === 'once' && input.dueAt ? input.dueAt : null;
+    const penalty = dueAt ? Math.max(0, Math.min(5000, Math.round(input.penalty || 0))) : 0;
+    if (dueAt && input.dueAt && !input.id && dueAt < Date.now()) fail('O prazo precisa ser uma data futura.');
     if (input.id) {
       const t = db.tasks.find((x) => x.id === input.id) || fail('Tarefa não encontrada.');
-      Object.assign(t, { title, description: input.description ?? t.description, xp: input.xp, childId: input.childId, repeat: input.repeat ?? t.repeat, needsPhoto: input.needsPhoto ?? t.needsPhoto, icon: taskIcon(title) });
+      Object.assign(t, { title, description: input.description ?? t.description, xp: input.xp, repeat, needsPhoto: input.needsPhoto ?? t.needsPhoto, icon: taskIcon(title), dueAt, penalty });
     } else {
-      db.tasks.push({ id: nextId(db, 't'), title, description: input.description || '', xp: input.xp, childId: input.childId, repeat: input.repeat || 'daily', needsPhoto: !!input.needsPhoto, icon: taskIcon(title), active: true });
+      const targets = input.childIds && input.childIds.length ? input.childIds : input.childId === 'all' ? db.children.map((c) => c.id) : [input.childId];
+      if (!targets.length || !targets[0]) fail('Escolha para quem é a tarefa.');
+      const groupId = input.joint && targets.length > 1 ? nextId(db, 'g') : null;
+      for (const cid of targets) db.tasks.push({ id: nextId(db, 't'), title, description: input.description || '', xp: input.xp, childId: cid, repeat, needsPhoto: !!input.needsPhoto, icon: taskIcon(title), active: true, dueAt, penalty, groupId });
     }
     saveDb();
     bump();
@@ -362,9 +407,9 @@ export const demoApi = {
     if (!(input.cost > 0 && input.cost <= 20000)) fail('O custo deve ser um número entre 1 e 20000 XP.');
     if (input.id) {
       const r = db.rewards.find((x) => x.id === input.id) || fail('Recompensa não encontrada.');
-      Object.assign(r, { title, description: input.description ?? r.description, cost: input.cost, icon: input.icon || r.icon, childId: input.childId || r.childId });
+      Object.assign(r, { title, description: input.description ?? r.description, cost: input.cost, icon: input.icon || r.icon, childId: input.childId || r.childId, expiresAt: input.expiresAt ?? null });
     } else {
-      db.rewards.push({ id: nextId(db, 'r'), title, description: input.description || '', cost: input.cost, icon: input.icon || 'gift', childId: input.childId || 'all', active: true });
+      db.rewards.push({ id: nextId(db, 'r'), title, description: input.description || '', cost: input.cost, icon: input.icon || 'gift', childId: input.childId || 'all', active: true, expiresAt: input.expiresAt ?? null });
     }
     saveDb();
     bump();

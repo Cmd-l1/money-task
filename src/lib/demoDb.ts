@@ -32,6 +32,7 @@ export interface DemoDB {
   ledger: LedgerEntry[];
   notices: Notice[];
   edu: Record<string, Record<string, { best: number; done: boolean }>>;
+  penalized?: string[]; // 'tarefa:membro' já descontados
   seq: number;
 }
 

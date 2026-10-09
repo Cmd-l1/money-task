@@ -165,10 +165,10 @@ export function Switch({ on, onChange, label }: { on: boolean; onChange: (v: boo
   return <button type="button" role="switch" aria-checked={on} aria-label={label} className={`switch ${on ? 'on' : ''}`} onClick={() => onChange(!on)} />;
 }
 
-export function Chip({ active, children, onClick, icon }: { active?: boolean; children: ReactNode; onClick?: () => void; icon?: string }) {
+export function Chip({ active, children, onClick, icon, tone }: { active?: boolean; children: ReactNode; onClick?: () => void; icon?: string; tone?: 'warn' | 'late' }) {
   const Tag = onClick ? 'button' : 'span';
   return (
-    <Tag className={`chip ${active ? 'active' : ''}`} onClick={onClick}>
+    <Tag className={`chip ${active ? 'active' : ''} ${tone || ''}`} onClick={onClick}>
       {icon && <Icon name={icon} size={14} />}
       {children}
     </Tag>
@@ -230,3 +230,35 @@ export const when = (t: number) => {
   return d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' }).replace('.', '');
 };
 export const xpText = (n: number) => `${n > 0 ? '+' : ''}${n.toLocaleString('pt-BR')} XP`;
+
+// ---------- prazos (data e hora) ----------
+const pad2 = (n: number) => String(n).padStart(2, '0');
+const toLocalInput = (ms: number | null | undefined) => {
+  if (!ms) return '';
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}T${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
+/** Campo de data e hora; devolve milissegundos (ou null quando vazio). */
+export function DateTimeInput({ value, onChange, invalid, label }: { value: number | null | undefined; onChange: (ms: number | null) => void; invalid?: boolean; label: string }) {
+  return (
+    <input
+      type="datetime-local"
+      aria-label={label}
+      className={`input datetime ${invalid ? 'invalid' : ''}`}
+      value={toLocalInput(value)}
+      onChange={(e) => {
+        const t = e.target.value ? new Date(e.target.value).getTime() : NaN;
+        onChange(Number.isNaN(t) ? null : t);
+      }}
+    />
+  );
+}
+/** "hoje 18:00", "amanhã 08:30" ou "12/10 18:00". */
+export const deadlineText = (t: number) => {
+  const d = new Date(t);
+  const hm = d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const now = new Date();
+  if (d.toDateString() === now.toDateString()) return `hoje ${hm}`;
+  if (d.toDateString() === new Date(now.getTime() + 86400000).toDateString()) return `amanhã ${hm}`;
+  return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)} ${hm}`;
+};

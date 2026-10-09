@@ -17,13 +17,26 @@ const uid = () => sb.myUserId() || fail('Entre para continuar.');
 const q = encodeURIComponent;
 
 // ---------- mapeamentos (banco -> app) ----------
-const mapTask = (r: Row): Task => ({ id: r.id, title: r.title, description: r.description || '', xp: r.xp, childId: r.child_id, repeat: r.recurrence, needsPhoto: !!r.require_photo, icon: taskIcon(r.title), active: !!r.active });
-const mapReward = (r: Row): Reward => ({ id: r.id, title: r.title, description: r.description || '', cost: r.cost_xp, icon: r.icon || 'gift', childId: r.child_id || 'all', active: !!r.active });
+const mapTask = (r: Row): Task => ({ id: r.id, title: r.title, description: r.description || '', xp: r.xp, childId: r.child_id, repeat: r.recurrence, needsPhoto: !!r.require_photo, icon: taskIcon(r.title), active: !!r.active, dueAt: r.due_at ? ts(r.due_at) : null, penalty: r.penalty_xp || 0, groupId: r.group_id || null });
+const mapReward = (r: Row): Reward => ({ id: r.id, title: r.title, description: r.description || '', cost: r.cost_xp, icon: r.icon || 'gift', childId: r.child_id || 'all', active: !!r.active, expiresAt: r.expires_at ? ts(r.expires_at) : null });
 const mapSub = (r: Row, photo?: string): Submission => ({ id: r.id, taskId: r.task_id, childId: r.child_id, status: r.status, photo, reason: r.reject_reason || undefined, createdAt: ts(r.submitted_at), decidedAt: ts(r.reviewed_at) || undefined });
 const mapRedemption = (r: Row): Redemption => ({ id: r.id, rewardId: r.reward_id, childId: r.child_id, cost: r.cost_xp, status: r.status, createdAt: ts(r.created_at) });
 const mapLedger = (r: Row): LedgerEntry => ({ id: r.id, childId: r.child_id, delta: r.delta, reason: r.description, createdAt: ts(r.created_at) });
 
+// aplica descontos de prazos vencidos (no servidor); no máximo 1 vez por 45 s e sem travar o app se a migração 003 ainda não rodou
+let lastTick = 0;
+async function tick() {
+  if (Date.now() - lastTick < 45000) return;
+  lastTick = Date.now();
+  try {
+    await sb.rpc('apply_penalties', {}, { quiet: true });
+  } catch {
+    /* função ainda não existe ou sem rede: ignora */
+  }
+}
+
 async function loadChildren(onlyId?: string): Promise<Child[]> {
+  await tick();
   const f = onlyId ? `&id=eq.${onlyId}` : '';
   const [ps, st, lg] = await Promise.all([
     sb.rest<Row[]>(`profiles?role=eq.child${f}&select=id,full_name,username,age&order=created_at.asc`),
@@ -47,7 +60,7 @@ async function oneChild(id: string): Promise<Child> {
 }
 const myId = () => {
   const s = getSession();
-  if (!s || s.role !== 'kid') return fail('Entre como filho para continuar.');
+  if (!s || s.role !== 'kid') return fail('Entre como membro para continuar.');
   return uid();
 };
 
@@ -143,7 +156,20 @@ export const realApi = {
     const id = myId();
     const [tasks, subs] = await Promise.all([sb.rest<Row[]>('tasks?active=eq.true&select=*&order=created_at.asc'), sb.rest<Row[]>(`task_submissions?child_id=eq.${id}&select=*&order=submitted_at.desc`)]);
     const ms = subs.map((s) => mapSub(s));
-    return tasks.map(mapTask).map((t) => ({ task: t, ...taskState(t, ms) }));
+    const mapped = tasks.map(mapTask);
+    let prog: Row[] = [];
+    if (mapped.some((t) => t.groupId)) {
+      try {
+        prog = await sb.rpc<Row[]>('joint_progress', {}, { quiet: true });
+      } catch {
+        prog = [];
+      }
+    }
+    return mapped.map((t) => ({
+      task: t,
+      ...taskState(t, ms),
+      partners: t.groupId ? prog.filter((p) => p.group_id === t.groupId).map((p) => ({ name: p.member_name, me: !!p.is_me, done: !!p.done })) : undefined,
+    }));
   },
   async myTask(taskId: string): Promise<KidTask> {
     const all = await realApi.myTasks();
@@ -166,7 +192,7 @@ export const realApi = {
   async myRewards(): Promise<Reward[]> {
     myId();
     const rows = await sb.rest<Row[]>('rewards?active=eq.true&select=*&order=cost_xp.asc');
-    return rows.map(mapReward);
+    return rows.map(mapReward).filter((r) => !r.expiresAt || r.expiresAt > Date.now());
   },
   async reward(rewardId: string): Promise<Reward> {
     const rows = await sb.rest<Row[]>(`rewards?id=eq.${rewardId}&select=*`);
@@ -288,7 +314,7 @@ export const realApi = {
   async createChild(input: { name: string; age: number; username: string; password: string }): Promise<Child> {
     const name = input.name.trim();
     const username = input.username.trim().toLowerCase();
-    if (!name) fail('Informe o nome do filho(a).');
+    if (!name) fail('Informe o nome do membro.');
     if (!(input.age >= 7 && input.age <= 18)) fail('A idade deve ser entre 7 e 18 anos.');
     if (!validUser(username)) fail('O usuário deve ter de 3 a 20 letras minúsculas, números, ponto ou _ (sem espaços).');
     if (input.password.length < 6) fail('A senha deve ter no mínimo 6 caracteres.');
@@ -317,19 +343,29 @@ export const realApi = {
     const rows = await sb.rest<Row[]>(`tasks?id=eq.${id}&select=*`);
     return rows[0] ? mapTask(rows[0]) : fail('Tarefa não encontrada.');
   },
-  async saveTask(input: Partial<Task> & { title: string; xp: number; childId: string }) {
+  async saveTask(input: Partial<Task> & { title: string; xp: number; childId: string; childIds?: string[]; joint?: boolean }) {
     const title = input.title.trim();
     if (!title) fail('Informe o título da tarefa.');
     if (!(input.xp > 0 && input.xp <= 5000)) fail('O XP deve ser um número entre 1 e 5000.');
-    if (!input.childId) fail('Escolha para quem é a tarefa.');
-    const body = (childId: string) => ({ title, description: input.description || null, xp: input.xp, child_id: childId, recurrence: input.repeat || 'daily', require_photo: !!input.needsPhoto });
+    const repeat = input.repeat || 'daily';
+    const dueAt = repeat === 'once' && input.dueAt ? input.dueAt : null;
+    const penalty = dueAt ? Math.max(0, Math.min(5000, Math.round(input.penalty || 0))) : 0;
+    if (dueAt && !input.id && dueAt < Date.now()) fail('O prazo precisa ser uma data futura.');
+    const body = (childId?: string) => {
+      const b: Record<string, unknown> = { title, description: input.description || null, xp: input.xp, recurrence: repeat, require_photo: !!input.needsPhoto };
+      if (childId) b.child_id = childId;
+      // colunas novas só são enviadas quando usadas (assim o app segue funcionando antes da migração 003)
+      if (dueAt || input.id) { b.due_at = dueAt ? new Date(dueAt).toISOString() : null; b.penalty_xp = penalty; }
+      return b;
+    };
     if (input.id) {
-      await sb.rest(`tasks?id=eq.${input.id}`, { method: 'PATCH', body: body(input.childId === 'all' ? (await realApi.task(input.id)).childId : input.childId) });
+      await sb.rest(`tasks?id=eq.${input.id}`, { method: 'PATCH', body: body() });
       return;
     }
-    const targets = input.childId === 'all' ? (await loadChildren()).map((c) => c.id) : [input.childId];
-    if (!targets.length) fail('Cadastre um membro antes de criar tarefas.');
-    await sb.rest('tasks', { method: 'POST', body: targets.map((c) => ({ ...body(c), parent_id: uid() })) });
+    const targets = input.childIds && input.childIds.length ? input.childIds : input.childId === 'all' ? (await loadChildren()).map((c) => c.id) : [input.childId];
+    if (!targets.length || !targets[0]) fail('Cadastre um membro antes de criar tarefas.');
+    const groupId = input.joint && targets.length > 1 ? crypto.randomUUID() : null;
+    await sb.rest('tasks', { method: 'POST', body: targets.map((c) => ({ ...body(c), parent_id: uid(), ...(groupId ? { group_id: groupId } : {}) })) });
   },
   async deleteTask(id: string) {
     await sb.rest(`tasks?id=eq.${id}`, { method: 'PATCH', body: { active: false } });
@@ -342,7 +378,8 @@ export const realApi = {
     if (!title) fail('Informe o nome da recompensa.');
     if (!(input.cost > 0 && input.cost <= 20000)) fail('O custo deve ser um número entre 1 e 20000 XP.');
     const childId = input.childId && input.childId !== 'all' ? input.childId : null;
-    const body = { title, description: input.description || null, cost_xp: input.cost, icon: input.icon || 'gift', child_id: childId };
+    const body: Record<string, unknown> = { title, description: input.description || null, cost_xp: input.cost, icon: input.icon || 'gift', child_id: childId };
+    if (input.expiresAt || input.id) body.expires_at = input.expiresAt ? new Date(input.expiresAt).toISOString() : null;
     if (input.id) await sb.rest(`rewards?id=eq.${input.id}`, { method: 'PATCH', body });
     else await sb.rest('rewards', { method: 'POST', body: { ...body, parent_id: uid() } });
   },
@@ -423,7 +460,7 @@ export const realApi = {
     }
     if (p.role !== 'parent') {
       await sb.signOut();
-      throw new AppError('Esta conta é de um filho. Use “Entrar com usuário e senha” na tela de entrada dos filhos.');
+      throw new AppError('Esta conta é de um membro. Use “Entrar com usuário e senha” na tela de entrada dos membros.');
     }
     setSession({ mode: 'real', role: 'parent', name: p.full_name });
   },

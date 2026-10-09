@@ -31,6 +31,9 @@ export interface Task {
   needsPhoto: boolean;
   icon: string;
   active: boolean;
+  dueAt?: number | null; // prazo (ms); vale para tarefas de uma vez
+  penalty?: number; // XP perdido se o prazo passar sem fazer
+  groupId?: string | null; // tarefa conjunta: mesmo grupo para todos os membros
 }
 export type SubStatus = 'pending' | 'approved' | 'rejected';
 export interface Submission {
@@ -51,6 +54,7 @@ export interface Reward {
   icon: string;
   childId: string | 'all';
   active: boolean;
+  expiresAt?: number | null; // prazo para resgatar (ms)
 }
 export interface Redemption {
   id: string;

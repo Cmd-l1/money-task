@@ -3,7 +3,7 @@ import { api, type KidTask } from '../../lib/api';
 import { currentQuery, navigate } from '../../lib/router';
 import { levelProgress } from '../../lib/xp';
 import { installApp, isIOS, isStandalone, shrinkImage } from '../../lib/pwa';
-import { Alert, BottomNav, Button, Chip, Empty, Loading, Progress, Sheet, TopBar, run, toast, useData, when, xpText, type NavItem } from '../../ui/kit';
+import { Alert, BottomNav, Button, Chip, Empty, Loading, Progress, Sheet, TopBar, run, toast, useData, deadlineText, when, xpText, type NavItem } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import type { Child, Reward } from '../../lib/types';
 
@@ -220,6 +220,8 @@ function NoticeSheet({ notice }: { notice: { id: string; kind: string; title: st
 function TaskRow({ t, compact }: { t: KidTask; compact?: boolean }) {
   const { task, state } = t;
   const done = state === 'done';
+  const open = state === 'todo' || state === 'rejected';
+  const late = open && !!task.dueAt && task.dueAt < Date.now();
   return (
     <div className="card tight col" style={{ gap: 10 }}>
       <div className="row">
@@ -230,32 +232,42 @@ function TaskRow({ t, compact }: { t: KidTask; compact?: boolean }) {
           <b className="t-h" style={{ textDecoration: done ? 'line-through' : 'none', opacity: done ? 0.7 : 1 }}>
             {task.title}
           </b>
-          {compact ? <span className="mint t-cap semi">+{task.xp} XP</span> : <span className="muted t-cap">{task.description}</span>}
+          {compact ? <span className="mint t-cap semi">+{task.xp} XP{open && task.dueAt && !late ? ` · até ${deadlineText(task.dueAt)}` : ''}</span> : <span className="muted t-cap">{task.description}</span>}
         </div>
-        {compact && (state === 'todo' || state === 'rejected') && (
+        {compact && late && <span className="badge late">Prazo vencido</span>}
+        {compact && open && !late && (
           <Button small onClick={() => navigate(`/filho/tarefas/${task.id}`)}>
             Concluir
           </Button>
         )}
       </div>
       {!compact && (
-        <div className="row between">
+        <div className="row between" style={{ flexWrap: 'wrap' }}>
           <div className="chips">
             <Chip icon="clock">{task.repeat === 'daily' ? 'Diária' : task.repeat === 'weekly' ? 'Semanal' : 'Uma vez'}</Chip>
             <span className="badge">+{task.xp} XP</span>
+            {open && task.dueAt && <Chip icon="clock" tone={late ? 'late' : undefined}>{late ? 'Prazo vencido' : `Até ${deadlineText(task.dueAt)}`}</Chip>}
+            {open && !!task.penalty && !late && <Chip tone="warn">−{task.penalty} XP se atrasar</Chip>}
           </div>
-          {state === 'todo' && (
+          {late && <span className="badge late">Sem tempo</span>}
+          {!late && state === 'todo' && (
             <Button small onClick={() => navigate(`/filho/tarefas/${task.id}`)}>
               Concluir
             </Button>
           )}
-          {state === 'rejected' && (
+          {!late && state === 'rejected' && (
             <Button small variant="danger-outline" onClick={() => navigate(`/filho/tarefas/${task.id}`)}>
               Refazer
             </Button>
           )}
           {state === 'pending' && <span className="badge warn">Aguardando</span>}
           {done && <span className="badge soft">Feita</span>}
+        </div>
+      )}
+      {!compact && t.partners && (
+        <div className="partners" aria-label="Quem faz esta tarefa junto">
+          <span className="muted t-cap" style={{ alignSelf: 'center' }}>Conjunta:</span>
+          {t.partners.map((p, i) => <Chip key={i} icon={p.done ? 'check' : 'user'} active={p.done}>{p.me ? 'Você' : p.name}{p.done ? ' · feito' : ''}</Chip>)}
         </div>
       )}
     </div>
@@ -323,7 +335,8 @@ export function KidDoTask({ id }: { id: string }) {
     setBusy(false);
     if (ok) navigate(`/filho/tarefas/${id}/enviada`, true);
   };
-  const locked = state === 'pending' || state === 'done';
+  const late = (state === 'todo' || state === 'rejected') && !!task.dueAt && task.dueAt < Date.now();
+  const locked = state === 'pending' || state === 'done' || late;
 
   return (
     <div className="screen pad-bottom-actions">
@@ -336,6 +349,18 @@ export function KidDoTask({ id }: { id: string }) {
         <span className="badge">+{task.xp} XP</span>
       </div>
       {task.description && <p className="muted">{task.description}</p>}
+      {task.dueAt && (state === 'todo' || state === 'rejected') && (
+        late
+          ? <Alert variant="destructive" icon="clock" title="Prazo vencido">O prazo desta tarefa acabou em {deadlineText(task.dueAt)}.{task.penalty ? ` Foram descontados até ${task.penalty} XP.` : ''}</Alert>
+          : <Alert variant="warning" icon="clock" title={`Faça até ${deadlineText(task.dueAt)}`}>{task.penalty ? `Se passar do prazo, você perde ${task.penalty} XP.` : 'Depois disso não dá mais para enviar.'}</Alert>
+      )}
+      {t.partners && (
+        <div className="col" style={{ gap: 8 }}>
+          <b className="t-label">Tarefa conjunta</b>
+          <div className="partners">{t.partners.map((p, i) => <Chip key={i} icon={p.done ? 'check' : 'user'} active={p.done}>{p.me ? 'Você' : p.name}{p.done ? ' · feito' : ''}</Chip>)}</div>
+          <span className="muted t-cap">Cada um ganha o XP ao concluir a sua parte.</span>
+        </div>
+      )}
       {state === 'rejected' && (
         <Alert variant="destructive" icon="alert" title="Recado do seu responsável">
           {submission?.reason || 'Seu responsável pediu para refazer. Pode enviar de novo!'}
@@ -479,6 +504,7 @@ export function KidShop() {
                     <div className="col grow" style={{ gap: 0 }}>
                       <b className="t-h">{r.title}</b>
                       <span className="muted t-cap">{r.description}</span>
+                      {r.expiresAt && <span style={{ marginTop: 6 }}><Chip icon="clock" tone="warn">Até {deadlineText(r.expiresAt)}</Chip></span>}
                     </div>
                     <span className="badge">{r.cost.toLocaleString('pt-BR')} XP</span>
                   </div>

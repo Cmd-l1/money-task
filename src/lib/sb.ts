@@ -232,7 +232,7 @@ export async function rest<T = any>(path: string, opts: { method?: 'GET' | 'POST
   }
 }
 
-export async function rpc<T = any>(name: string, args: Record<string, unknown> = {}): Promise<T> {
+export async function rpc<T = any>(name: string, args: Record<string, unknown> = {}, opts: { quiet?: boolean } = {}): Promise<T> {
   cache.clear();
   try {
     const res = await authed(`/rest/v1/rpc/${name}`, { method: 'POST', body: JSON.stringify(args) });
@@ -241,7 +241,7 @@ export async function rpc<T = any>(name: string, args: Record<string, unknown> =
     return body as T;
   } finally {
     cache.clear();
-    bump();
+    if (!opts.quiet) bump();
   }
 }
 
@@ -258,7 +258,7 @@ export async function adminAction<T = any>(action: string, payload: Record<strin
       throw e;
     }
     const body = await parse(res);
-    if (res.status === 404) throw new AppError('A função de servidor ainda não foi ativada no Supabase. Veja supabase/LEIA-ME.md.');
+    if (res.status === 404 && typeof body?.error !== 'string') throw new AppError('A função de servidor ainda não foi ativada no Supabase. Veja supabase/LEIA-ME.md.');
     if (!res.ok) throw new AppError(typeof body?.error === 'string' ? body.error : friendly(res.status, body, 'Não foi possível concluir a ação. Tente de novo.'));
     return body as T;
   } finally {

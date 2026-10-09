@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import { api, getSession } from '../../lib/api';
 import { navigate, currentQuery } from '../../lib/router';
-import { Alert, BottomNav, Button, Chip, Empty, Field, Loading, PasswordInput, Progress, Sheet, Switch, TextInput, TopBar, run, toast, useData, when, xpText, type NavItem } from '../../ui/kit';
+import { Alert, BottomNav, Button, Chip, DateTimeInput, Empty, Field, Loading, PasswordInput, Progress, Sheet, Switch, TextInput, TopBar, run, toast, useData, deadlineText, when, xpText, type NavItem } from '../../ui/kit';
 import { Icon, REWARD_ICONS } from '../../ui/Icon';
 import { InstallBanner } from '../kid/Kid';
 import type { Child, Repeat } from '../../lib/types';
@@ -103,10 +103,10 @@ export function Members() {
         </div>
         {kids && kids.length > 0 && <button className="back" onClick={() => navigate('/pai/membros/novo')} aria-label="Adicionar membro"><Icon name="plus" size={20} /></button>}
       </div>
-      <Alert icon="info" title="Dica">O filho entra com o usuário e a senha que você definir. Não precisa de e-mail.</Alert>
+      <Alert icon="info" title="Dica">O membro entra com o usuário e a senha que você definir. Não precisa de e-mail.</Alert>
       {!kids ? <Loading /> : kids.length === 0 ? (
         <>
-          <Empty icon="users" title="Ainda não há membros na família" text="Cadastre o perfil do seu filho para ele começar a ganhar XP." />
+          <Empty icon="users" title="Ainda não há membros na família" text="Cadastre o perfil do membro para ele começar a ganhar XP." />
           <Button icon="plus" onClick={() => navigate('/pai/membros/novo')}>Adicionar membro</Button>
         </>
       ) : (
@@ -148,12 +148,12 @@ export function AddMember() {
   return (
     <div className="screen pad-bottom-actions">
       <TopBar title="Adicionar membro" />
-      <Field label="Nome do filho(a)" error={err.name}><TextInput placeholder="Ex.: Lucas" value={f.name} onChange={(e) => set('name', e.target.value)} invalid={!!err.name} /></Field>
+      <Field label="Nome do membro" error={err.name}><TextInput placeholder="Ex.: Lucas" value={f.name} onChange={(e) => set('name', e.target.value)} invalid={!!err.name} /></Field>
       <Field label="Idade" error={err.age} hint="De 7 a 18 anos. A idade define o conteúdo do app.">
         <TextInput inputMode="numeric" placeholder="Ex.: 14" value={f.age} onChange={(e) => set('age', e.target.value.replace(/\D/g, '').slice(0, 2))} invalid={!!err.age} />
       </Field>
-      <h2 className="t-h mint" style={{ marginTop: 4 }}>Acesso do filho(a)</h2>
-      <Field label="Nome de usuário" error={err.username} hint="Sem espaços. É com ele que seu filho entra.">
+      <h2 className="t-h mint" style={{ marginTop: 4 }}>Acesso do membro</h2>
+      <Field label="Nome de usuário" error={err.username} hint="Sem espaços. É com ele que o membro entra.">
         <TextInput autoCapitalize="none" autoCorrect="off" placeholder="Ex.: lucas14" value={f.username} onChange={(e) => set('username', e.target.value.toLowerCase().replace(/\s/g, ''))} invalid={!!err.username} />
       </Field>
       <Field label="Senha" error={err.pass}><PasswordInput placeholder="Mínimo de 6 caracteres" value={f.pass} onChange={(e) => set('pass', e.target.value)} /></Field>
@@ -224,9 +224,9 @@ export function EditMember({ id }: { id: string }) {
   return (
     <div className="screen pad-bottom-actions">
       <TopBar title="Editar membro" />
-      <Field label="Nome do filho(a)"><TextInput value={v.name} onChange={(e) => set('name', e.target.value)} /></Field>
+      <Field label="Nome do membro"><TextInput value={v.name} onChange={(e) => set('name', e.target.value)} /></Field>
       <Field label="Idade"><TextInput inputMode="numeric" value={v.age} onChange={(e) => set('age', e.target.value.replace(/\D/g, '').slice(0, 2))} /></Field>
-      <Field label="Nome de usuário" hint="Mudar o usuário exige que o filho entre de novo."><TextInput autoCapitalize="none" value={v.username} onChange={(e) => set('username', e.target.value.toLowerCase().replace(/\s/g, ''))} /></Field>
+      <Field label="Nome de usuário" hint="Mudar o usuário exige que o membro entre de novo."><TextInput autoCapitalize="none" value={v.username} onChange={(e) => set('username', e.target.value.toLowerCase().replace(/\s/g, ''))} /></Field>
       <Button variant="outline" icon="key" onClick={() => setPw(true)}>Redefinir senha</Button>
       <Button variant="danger-outline" icon="trash" onClick={() => setRm(true)}>Remover membro</Button>
       <div className="footer-actions"><Button disabled={busy} onClick={save}>Salvar alterações</Button></div>
@@ -293,7 +293,7 @@ export function ParentTasks() {
                 <span className="badge">+{t.xp} XP</span>
               </div>
               <div className="row between">
-                <div className="chips"><Chip icon="user">{nameOf(t.childId)}</Chip><Chip icon="clock">{repeatLabel(t.repeat)}</Chip>{t.needsPhoto && <Chip icon="camera">Foto</Chip>}</div>
+                <div className="chips"><Chip icon="user">{nameOf(t.childId)}</Chip><Chip icon="clock">{repeatLabel(t.repeat)}</Chip>{t.needsPhoto && <Chip icon="camera">Foto</Chip>}{t.groupId && <Chip icon="users">Conjunta</Chip>}{t.dueAt && <Chip icon="clock" tone={t.dueAt < Date.now() ? 'late' : undefined}>{t.dueAt < Date.now() ? 'Prazo vencido' : `Até ${deadlineText(t.dueAt)}`}</Chip>}{!!t.penalty && <Chip tone="warn">−{t.penalty} XP</Chip>}</div>
                 <button className="back" style={{ width: 36, height: 36 }} onClick={() => navigate(`/pai/tarefas/${t.id}`)} aria-label={`Editar ${t.title}`}><Icon name="edit" size={16} /></button>
               </div>
             </div>
@@ -317,7 +317,7 @@ export function TaskForm({ id }: { id?: string }) {
   const { data: kids } = useData(() => api.children());
   const { data: existing } = useData(async () => (id ? api.task(id) : undefined), [id]);
   const m = TEMPLATES[parseInt(currentQuery().get('modelo') || '-1', 10)];
-  const [f, setF] = useState<{ title: string; description: string; xp: string; childId: string; repeat: Repeat; needsPhoto: boolean } | null>(null);
+  const [f, setF] = useState<{ title: string; description: string; xp: string; childIds: string[]; repeat: Repeat; needsPhoto: boolean; joint: boolean; dueAt: number | null; penalty: string } | null>(null);
   const [err, setErr] = useState<Record<string, string>>({});
   const [del, setDel] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -325,19 +325,23 @@ export function TaskForm({ id }: { id?: string }) {
   const v =
     f ||
     (existing
-      ? { title: existing.title, description: existing.description, xp: String(existing.xp), childId: existing.childId, repeat: existing.repeat, needsPhoto: existing.needsPhoto }
-      : { title: m?.title || '', description: m?.description || '', xp: String(m?.xp || 100), childId: kids[0]?.id || '', repeat: (m?.repeat || 'daily') as Repeat, needsPhoto: false });
+      ? { title: existing.title, description: existing.description, xp: String(existing.xp), childIds: [existing.childId], repeat: existing.repeat, needsPhoto: existing.needsPhoto, joint: !!existing.groupId, dueAt: existing.dueAt || null, penalty: String(existing.penalty || 0) }
+      : { title: m?.title || '', description: m?.description || '', xp: String(m?.xp || 100), childIds: kids[0] ? [kids[0].id] : [], repeat: (m?.repeat || 'daily') as Repeat, needsPhoto: false, joint: false, dueAt: null, penalty: '0' });
   const set = (p: Partial<typeof v>) => setF({ ...v, ...p });
   const save = async () => {
     const e: Record<string, string> = {};
     const xp = parseInt(v.xp, 10);
     if (!v.title.trim()) e.title = 'Informe o título.';
     if (!(xp > 0 && xp <= 5000)) e.xp = 'Digite um valor de 1 a 5000.';
-    if (!v.childId) e.child = 'Adicione um membro antes de criar tarefas.';
+    if (!v.childIds.length) e.child = kids.length ? 'Escolha pelo menos um membro.' : 'Adicione um membro antes de criar tarefas.';
+    const penalty = parseInt(v.penalty || '0', 10) || 0;
+    const dueAt = v.repeat === 'once' ? v.dueAt : null;
+    if (dueAt && !id && dueAt < Date.now()) e.due = 'Escolha uma data e hora no futuro.';
+    if (penalty > 0 && !dueAt) e.due = 'Para perder XP, defina um prazo.';
     setErr(e);
     if (Object.keys(e).length) return;
     setBusy(true);
-    const ok = await run(() => api.saveTask({ id, title: v.title, description: v.description, xp, childId: v.childId, repeat: v.repeat, needsPhoto: v.needsPhoto }), id ? 'Tarefa atualizada.' : 'Tarefa criada!');
+    const ok = await run(() => api.saveTask({ id, title: v.title, description: v.description, xp, childId: v.childIds[0], childIds: v.childIds, joint: v.joint && v.childIds.length > 1, repeat: v.repeat, needsPhoto: v.needsPhoto, dueAt, penalty: dueAt ? penalty : 0 }), id ? 'Tarefa atualizada.' : v.childIds.length > 1 ? 'Tarefas criadas!' : 'Tarefa criada!');
     setBusy(false);
     if (ok) navigate('/pai/tarefas', true);
   };
@@ -352,18 +356,49 @@ export function TaskForm({ id }: { id?: string }) {
           {[50, 100, 200].map((n) => <Chip key={n} onClick={() => set({ xp: String(n) })} active={v.xp === String(n)}>{n}</Chip>)}
         </div>
       </Field>
-      <Field label="Para quem?" error={err.child}>
+      <Field label={id ? 'Para quem?' : 'Para quem? (pode escolher mais de um)'} error={err.child}>
         <div className="chips">
-          {kids.map((k) => <Chip key={k.id} active={v.childId === k.id} onClick={() => set({ childId: k.id })}>{k.name}</Chip>)}
-          {kids.length > 1 && <Chip active={v.childId === 'all'} onClick={() => set({ childId: 'all' })}>Todos</Chip>}
+          {id
+            ? <Chip active icon="user">{kids.find((k) => k.id === v.childIds[0])?.name || '—'}</Chip>
+            : (
+              <>
+                {kids.map((k) => <Chip key={k.id} active={v.childIds.includes(k.id)} onClick={() => set({ childIds: v.childIds.includes(k.id) ? v.childIds.filter((x) => x !== k.id) : [...v.childIds, k.id] })}>{k.name}</Chip>)}
+                {kids.length > 1 && <Chip active={v.childIds.length === kids.length} onClick={() => set({ childIds: v.childIds.length === kids.length ? [] : kids.map((k) => k.id) })}>Todos</Chip>}
+              </>
+            )}
         </div>
       </Field>
+      {!id && v.childIds.length > 1 && (
+        <div className="card tight row">
+          <div className="tile dark sm"><Icon name="users" size={16} /></div>
+          <div className="col grow" style={{ gap: 0 }}><b className="t-label">Tarefa conjunta</b><span className="muted t-cap">O grupo faz junto; cada membro ganha o XP ao concluir a sua parte.</span></div>
+          <Switch on={v.joint} onChange={(b) => set({ joint: b })} label="Tarefa conjunta" />
+        </div>
+      )}
       <Field label="Repetição">
         <div className="chips">{(['once', 'daily', 'weekly'] as Repeat[]).map((r) => <Chip key={r} active={v.repeat === r} onClick={() => set({ repeat: r })}>{repeatLabel(r)}</Chip>)}</div>
       </Field>
+      {v.repeat === 'once' && (
+        <>
+          <Field label="Prazo para fazer (opcional)" error={err.due} hint="Depois desse horário o membro não consegue mais enviar a tarefa.">
+            <div className="row">
+              <div className="grow"><DateTimeInput label="Prazo da tarefa" value={v.dueAt} onChange={(ms) => set({ dueAt: ms })} invalid={!!err.due} /></div>
+              {v.dueAt && <button type="button" className="back" style={{ width: 40, height: 40 }} onClick={() => set({ dueAt: null, penalty: '0' })} aria-label="Remover prazo"><Icon name="x" size={16} /></button>}
+            </div>
+          </Field>
+          {v.dueAt && (
+            <Field label="XP perdido se o prazo passar" hint="Descontado automaticamente do saldo do membro, uma vez. Deixe 0 para não descontar.">
+              <div className="row">
+                <TextInput inputMode="numeric" aria-label="XP perdido" value={v.penalty} onChange={(e) => set({ penalty: e.target.value.replace(/\D/g, '').slice(0, 4) })} />
+                {[25, 50, 100].map((n) => <Chip key={n} onClick={() => set({ penalty: String(n) })} active={v.penalty === String(n)}>{n}</Chip>)}
+              </div>
+            </Field>
+          )}
+        </>
+      )}
       <div className="card tight row">
         <div className="tile dark sm"><Icon name="camera" size={16} /></div>
-        <div className="col grow" style={{ gap: 0 }}><b className="t-label">Pedir foto como prova</b><span className="muted t-cap">O filho envia uma foto ao concluir.</span></div>
+        <div className="col grow" style={{ gap: 0 }}><b className="t-label">Pedir foto como prova</b><span className="muted t-cap">O membro envia uma foto ao concluir.</span></div>
         <Switch on={v.needsPhoto} onChange={(b) => set({ needsPhoto: b })} label="Pedir foto como prova" />
       </div>
       {id && <Button variant="danger-outline" icon="trash" onClick={() => setDel(true)}>Excluir tarefa</Button>}
@@ -371,7 +406,7 @@ export function TaskForm({ id }: { id?: string }) {
       <Sheet open={del} onClose={() => setDel(false)}>
         <div className="tile lg danger icon-top"><Icon name="trash" size={26} /></div>
         <h2 className="t-m" style={{ textAlign: 'center' }}>Excluir tarefa?</h2>
-        <p className="muted" style={{ textAlign: 'center' }}>“{v.title}” deixará de aparecer para o seu filho. O XP já ganho continua.</p>
+        <p className="muted" style={{ textAlign: 'center' }}>“{v.title}” deixará de aparecer para o membro. O XP já ganho continua.</p>
         <Button variant="danger" onClick={async () => { if (await run(() => api.deleteTask(id!), 'Tarefa excluída.')) navigate('/pai/tarefas', true); }}>Excluir</Button>
         <Button variant="outline" onClick={() => setDel(false)}>Cancelar</Button>
       </Sheet>
@@ -398,14 +433,14 @@ export function ParentRewards() {
       </div>
       {tab === 'ativas' ? (
         rewards.length === 0 ? (
-          <Empty icon="gift" title="Nenhuma recompensa criada" text="Crie prêmios para motivar seus filhos, como um passeio ou uma sobremesa." action={<Button icon="plus" onClick={() => navigate('/pai/recompensas/nova')}>Criar recompensa</Button>} />
+          <Empty icon="gift" title="Nenhuma recompensa criada" text="Crie prêmios para motivar os membros, como um passeio ou uma sobremesa." action={<Button icon="plus" onClick={() => navigate('/pai/recompensas/nova')}>Criar recompensa</Button>} />
         ) : (
           <>
             <Alert variant="promo" icon="gift" title="Motive com recompensas" action={<Button small onClick={() => navigate('/pai/recompensas/nova')}>Criar</Button>}>Crie uma de 100 XP, como uma sobremesa.</Alert>
             {rewards.map((r) => (
               <div key={r.id} className="card tight row">
                 <div className="tile"><Icon name={r.icon} size={22} /></div>
-                <div className="col grow" style={{ gap: 0, minWidth: 0 }}><b className="t-h">{r.title}</b><span className="muted t-cap">{r.description}</span></div>
+                <div className="col grow" style={{ gap: 0, minWidth: 0 }}><b className="t-h">{r.title}</b><span className="muted t-cap">{r.description}</span>{r.expiresAt && <span style={{ marginTop: 6 }}><Chip icon="clock" tone={r.expiresAt < Date.now() ? 'late' : undefined}>{r.expiresAt < Date.now() ? 'Encerrada' : `Até ${deadlineText(r.expiresAt)}`}</Chip></span>}</div>
                 <span className="badge">{r.cost} XP</span>
                 <button className="back" style={{ width: 34, height: 34 }} onClick={() => navigate(`/pai/recompensas/${r.id}`)} aria-label={`Editar ${r.title}`}><Icon name="edit" size={15} /></button>
               </div>
@@ -413,7 +448,7 @@ export function ParentRewards() {
           </>
         )
       ) : reds.length === 0 ? (
-        <Empty icon="gift" title="Nenhum resgate ainda" text="Quando seus filhos trocarem XP por prêmios, você vê aqui." />
+        <Empty icon="gift" title="Nenhum resgate ainda" text="Quando os membros trocarem XP por prêmios, você vê aqui." />
       ) : (
         reds.map((x) => (
           <div key={x.id} className="card col" style={{ gap: 10 }}>
@@ -434,23 +469,24 @@ export function RewardForm({ id }: { id?: string }) {
   const { data: kids } = useData(() => api.children());
   const { data: all } = useData(() => api.rewards());
   const existing = id ? all?.find((r) => r.id === id) : undefined;
-  const [f, setF] = useState<{ title: string; description: string; cost: string; icon: string; childId: string } | null>(null);
+  const [f, setF] = useState<{ title: string; description: string; cost: string; icon: string; childId: string; expiresAt: number | null } | null>(null);
   const [err, setErr] = useState<Record<string, string>>({});
   const [del, setDel] = useState(false);
   const [busy, setBusy] = useState(false);
   if (!kids || !all) return <div className="screen"><TopBar title="Recompensa" /><Loading /></div>;
   if (id && !existing) return <div className="screen"><TopBar title="Recompensa" onBack={() => navigate('/pai/recompensas')} /><Alert variant="destructive" icon="alert" title="Não encontrada">Essa recompensa não existe mais.</Alert></div>;
-  const v = f || (existing ? { title: existing.title, description: existing.description, cost: String(existing.cost), icon: existing.icon, childId: existing.childId } : { title: '', description: '', cost: '300', icon: 'gift', childId: 'all' });
+  const v = f || (existing ? { title: existing.title, description: existing.description, cost: String(existing.cost), icon: existing.icon, childId: existing.childId, expiresAt: existing.expiresAt || null } : { title: '', description: '', cost: '300', icon: 'gift', childId: 'all', expiresAt: null });
   const set = (p: Partial<typeof v>) => setF({ ...v, ...p });
   const save = async () => {
     const e: Record<string, string> = {};
     const cost = parseInt(v.cost, 10);
     if (!v.title.trim()) e.title = 'Informe o nome.';
     if (!(cost > 0 && cost <= 20000)) e.cost = 'Digite um valor de 1 a 20000.';
+    if (v.expiresAt && !id && v.expiresAt < Date.now()) e.exp = 'Escolha uma data e hora no futuro.';
     setErr(e);
     if (Object.keys(e).length) return;
     setBusy(true);
-    const ok = await run(() => api.saveReward({ id, title: v.title, description: v.description, cost, icon: v.icon, childId: v.childId }), id ? 'Recompensa atualizada.' : 'Recompensa criada!');
+    const ok = await run(() => api.saveReward({ id, title: v.title, description: v.description, cost, icon: v.icon, childId: v.childId, expiresAt: v.expiresAt }), id ? 'Recompensa atualizada.' : 'Recompensa criada!');
     setBusy(false);
     if (ok) navigate('/pai/recompensas', true);
   };
@@ -462,6 +498,12 @@ export function RewardForm({ id }: { id?: string }) {
       <Field label="Custo em XP" error={err.cost}><TextInput inputMode="numeric" value={v.cost} onChange={(e) => set({ cost: e.target.value.replace(/\D/g, '').slice(0, 5) })} invalid={!!err.cost} /></Field>
       <Field label="Ícone">
         <div className="chips">{REWARD_ICONS.map((ic) => <button key={ic} className={`tile ${v.icon === ic ? '' : 'dark'}`} style={{ border: v.icon === ic ? 'none' : '1px solid var(--border)' }} onClick={() => set({ icon: ic })} aria-label={`Ícone ${ic}`} aria-pressed={v.icon === ic}><Icon name={ic} size={22} /></button>)}</div>
+      </Field>
+      <Field label="Disponível até (opcional)" error={err.exp} hint="Depois desse horário a recompensa some da loja.">
+        <div className="row">
+          <div className="grow"><DateTimeInput label="Prazo da recompensa" value={v.expiresAt} onChange={(ms) => set({ expiresAt: ms })} invalid={!!err.exp} /></div>
+          {v.expiresAt && <button type="button" className="back" style={{ width: 40, height: 40 }} onClick={() => set({ expiresAt: null })} aria-label="Remover prazo"><Icon name="x" size={16} /></button>}
+        </div>
       </Field>
       <Field label="Disponível para">
         <div className="chips"><Chip active={v.childId === 'all'} onClick={() => set({ childId: 'all' })}>Todos</Chip>{kids.map((k) => <Chip key={k.id} active={v.childId === k.id} onClick={() => set({ childId: k.id })}>{k.name}</Chip>)}</div>
@@ -520,7 +562,7 @@ export function Approvals() {
               </div>
             </div>
           ))}
-          <p className="muted t-cap"><Icon name="info" size={13} /> Ao aprovar, o XP é creditado no saldo do seu filho na hora.</p>
+          <p className="muted t-cap"><Icon name="info" size={13} /> Ao aprovar, o XP é creditado no saldo do membro na hora.</p>
         </>
       )}
     </div>
@@ -538,7 +580,7 @@ export function Reject({ id }: { id: string }) {
     <div className="screen pad-bottom-actions">
       <TopBar title="Recusar tarefa" onBack={() => navigate('/pai/aprovacoes')} />
       {s && <div className="card row"><div className="tile"><Icon name={s.task?.icon || 'list'} size={22} /></div><div className="col grow" style={{ gap: 0 }}><b className="t-h">{s.task?.title}</b><span className="muted t-cap">{s.child?.name}</span></div></div>}
-      <p className="muted">Conte ao seu filho o que precisa melhorar. Ele poderá enviar a tarefa de novo.</p>
+      <p className="muted">Conte ao membro o que precisa melhorar. Ele poderá enviar a tarefa de novo.</p>
       <div className="chips">{quick.map((q) => <Chip key={q} active={reason === q} onClick={() => setReason(q)}>{q}</Chip>)}</div>
       <Field label="Motivo (opcional)"><textarea className="textarea" placeholder="Ex.: Faltou resolver os últimos exercícios." value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
       <div className="footer-actions">
@@ -599,10 +641,10 @@ export function Privacy() {
     <div className="screen">
       <TopBar title="Privacidade e LGPD" onBack={() => navigate('/pai/perfil')} />
       <div className="card col">
-        <b className="t-h">O que guardamos dos seus filhos</b>
+        <b className="t-h">O que guardamos dos membros</b>
         {['Nome e idade', 'Nome de usuário e senha (protegida)', 'XP, tarefas e resgates'].map((t) => <span key={t} className="muted"><span className="mint"><Icon name="check" size={14} /></span> {t}</span>)}
       </div>
-      <Alert icon="shield" title="Consentimento registrado">Você autorizou o tratamento dos dados dos seus filhos ao criar a conta.</Alert>
+      <Alert icon="shield" title="Consentimento registrado">Você autorizou o tratamento dos dados dos membros da família ao criar a conta.</Alert>
       <Button variant="outline" icon="download" onClick={download}>Baixar meus dados</Button>
       <Button variant="danger-outline" icon="trash" onClick={() => setDel(true)}>Excluir conta e todos os dados</Button>
       <Sheet open={del} onClose={() => setDel(false)}>
@@ -629,7 +671,7 @@ export function Reports() {
             <div className="card stat"><b>{data.total.toLocaleString('pt-BR')}</b><span>XP da família</span></div>
             <div className="card stat"><b>{data.tasks}</b><span>Tarefas feitas</span></div>
           </div>
-          <h2 className="t-s">XP por filho</h2>
+          <h2 className="t-s">XP por membro</h2>
           {data.perChild.length === 0 ? <Empty icon="chart" title="Sem dados" text="Adicione membros para ver os relatórios." /> : data.perChild.map((c) => {
             const max = Math.max(1, ...data.perChild.map((x) => x.xp));
             return (

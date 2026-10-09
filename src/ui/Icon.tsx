@@ -59,6 +59,7 @@ export const REWARD_ICONS = ['gift', 'utensils', 'gamepad', 'film'];
 /** Escolhe um ícone para a tarefa a partir do título. */
 export function taskIcon(title: string): string {
   const t = title.toLowerCase();
+  if (/(conhe[cç]a o money)/.test(t)) return 'star';
   if (/(estud|ler|li[cç][aã]o|dever|prova|matem|leitura)/.test(t)) return 'book';
   if (/(lou[cç]a|cozinh|comida|prato|mesa)/.test(t)) return 'utensils';
   if (/(casa|quarto|arrum|varrer|limp|cama|lixo|roupa)/.test(t)) return 'home';

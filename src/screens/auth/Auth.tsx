@@ -47,7 +47,7 @@ export function ParentLogin() {
       <div className="hero" style={{ paddingTop: 32 }}>
         <div className="brand">money task</div>
         <h1 className="t-l">Bem-vindo de volta</h1>
-        <p className="muted">Acompanhe a rotina dos seus filhos.</p>
+        <p className="muted">Acompanhe a rotina dos membros da sua família.</p>
       </div>
       {!REAL_ACCOUNTS && (
         <Alert variant="promo" icon="info" title="Versão de demonstração">
@@ -106,7 +106,7 @@ export function ParentSignup() {
       <div className="hero" style={{ paddingTop: 16 }}>
         <div className="brand">money task</div>
         <h1 className="t-l">Crie sua conta</h1>
-        <p className="muted">Cadastro exclusivo para pais e responsáveis.</p>
+        <p className="muted">Cadastro exclusivo para responsáveis.</p>
       </div>
       <div className="card col gap-16" style={{ padding: 20 }}>
         <Field label="Nome completo" error={err.name}>
@@ -125,7 +125,7 @@ export function ParentSignup() {
         <p className="sep-text">
           Já tem conta? <a href="#/entrar">Entrar</a>
         </p>
-        <Alert icon="info" title="Seus filhos não criam conta">
+        <Alert icon="info" title="Os membros não criam conta">
           Você cadastra o usuário e a senha deles depois, na aba Membros.
         </Alert>
       </div>
@@ -156,13 +156,13 @@ export function Consent() {
     <div className="screen pad-bottom-actions">
       <TopBar title="Privacidade e consentimento" />
       <div className="card col gap-16">
-        <h2 className="t-h">Seus filhos são menores de idade</h2>
+        <h2 className="t-h">Os membros da família são menores de idade</h2>
         <p className="muted">
-          Pela LGPD (Lei nº 13.709/2018), o tratamento de dados de crianças e adolescentes exige o consentimento de um dos pais ou responsável legal. Por isso pedimos sua autorização.
+          Pela LGPD (Lei nº 13.709/2018), o tratamento de dados de crianças e adolescentes exige o consentimento de um responsável legal. Por isso pedimos sua autorização.
         </p>
         <hr className="divider" />
         <div className="col" style={{ gap: 10 }}>
-          <b className="t-label">O que guardamos sobre cada filho</b>
+          <b className="t-label">O que guardamos sobre cada membro</b>
           {['Nome e idade', 'Nome de usuário e senha (protegida)', 'XP, tarefas, fotos de prova e resgates'].map((t) => (
             <div key={t} className="row" style={{ gap: 10 }}>
               <span className="mint"><Icon name="check" size={16} /></span>
@@ -177,7 +177,7 @@ export function Consent() {
       </div>
       <label className="card tight row" style={{ alignItems: 'flex-start', cursor: 'pointer' }}>
         <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} style={{ width: 22, height: 22, accentColor: '#6ceba8', marginTop: 2 }} />
-        <span className="t-body">Sou o responsável legal e autorizo o tratamento dos dados dos meus filhos para o uso do app.</span>
+        <span className="t-body">Sou o responsável legal e autorizo o tratamento dos dados dos membros da minha família para o uso do app.</span>
       </label>
       {err && (
         <Alert variant="destructive" icon="alert" title="Não foi possível criar a conta">
@@ -229,10 +229,10 @@ export function FamilyInfo() {
     <div className="screen pad-bottom-actions">
       <TopBar title="Sobre sua família" />
       <div className="col">
-        <h2 className="t-l">Quantos filhos vão usar o app?</h2>
+        <h2 className="t-l">Quantos membros vão usar o app?</h2>
         <p className="muted">Opcional. Você pode adicionar quantos quiser depois.</p>
       </div>
-      <Field label="Quantidade de filhos">
+      <Field label="Quantidade de membros">
         <TextInput inputMode="numeric" placeholder="Ex.: 2" value={n} onChange={(e) => setN(e.target.value.replace(/\D/g, '').slice(0, 2))} />
       </Field>
       <div className="footer-actions">
@@ -293,7 +293,7 @@ export function Forgot() {
       <Field label="E-mail" error={err}>
         <TextInput type="email" inputMode="email" placeholder="seuemail@exemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} invalid={!!err} />
       </Field>
-      <Alert icon="info" title="Seu filho esqueceu a senha?">
+      <Alert icon="info" title="Um membro esqueceu a senha?">
         Ele não recebe link: você redefine em Membros &gt; Editar membro.
       </Alert>
       <div className="footer-actions">
@@ -407,7 +407,7 @@ export function ChildLogin() {
           Use <b>lucas14</b> e senha <b>lucas123</b> (14 anos) ou <b>pedro17</b> e <b>pedro123</b> (17 anos, com educação financeira).
         </Alert>
         <p className="sep-text muted t-cap">
-          É pai, mãe ou responsável? <a href="#/entrar">Entrar aqui</a>
+          É responsável? <a href="#/entrar">Entrar aqui</a>
         </p>
       </div>
     </div>
@@ -496,10 +496,10 @@ export function DemoPicker() {
       <TopBar title="Modo demonstração" onBack={() => navigate('/entrar')} />
       <p className="muted">Escolha como explorar o app. Os dados são fictícios e ficam só neste aparelho.</p>
       <Item icon="user" title="Entrar como responsável" sub="Veja aprovações, tarefas e membros." onClick={() => go('parent')} />
-      <Item icon="gamepad" title="Entrar como filho · 9 anos" sub="Tarefas, loja e conquistas." onClick={() => go('kid', 'c-mari')} />
-      <Item icon="book" title="Entrar como filho · 17 anos" sub="Inclui a trilha de educação financeira." onClick={() => go('kid', 'c-pedro')} />
+      <Item icon="gamepad" title="Entrar como membro · 9 anos" sub="Tarefas, loja e conquistas." onClick={() => go('kid', 'c-mari')} />
+      <Item icon="book" title="Entrar como membro · 17 anos" sub="Inclui a trilha de educação financeira." onClick={() => go('kid', 'c-pedro')} />
       <Alert variant="promo" icon="star" title="Gostou do money task?">
-        <span>Crie sua conta grátis e acompanhe a rotina de verdade com seus filhos.</span>
+        <span>Crie sua conta grátis e acompanhe a rotina de verdade com os membros da sua família.</span>
         <span style={{ display: 'block', marginTop: 10 }}>
           <Button small onClick={() => navigate('/cadastro')}>
             Criar conta grátis
@@ -520,7 +520,7 @@ export function About() {
         <p className="muted">Tarefas, XP e educação financeira para famílias.</p>
       </div>
       <div className="card col">
-        <p className="muted">Projeto de conclusão de curso (Design, FURB). Pais criam tarefas e recompensas, e os filhos ganham XP ao concluir e trocam por prêmios combinados em família.</p>
+        <p className="muted">Projeto de conclusão de curso (Design, FURB). Responsáveis criam tarefas e recompensas, e os membros ganham XP ao concluir e trocam por prêmios combinados em família.</p>
         <hr className="divider" />
         <div className="row-kv"><span className="muted">Versão</span><b>{import.meta.env.VITE_APP_VERSION || 'dev'}</b></div>
         <div className="row-kv"><span className="muted">Faixa etária</span><b>7 a 18 anos</b></div>

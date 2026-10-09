@@ -48,9 +48,9 @@ async function requireParent(id: string) {
   if (rows[0]?.role !== 'parent') throw new HttpError(403, 'Apenas responsáveis podem fazer isso.');
 }
 async function requireMyChild(parentId: string, childId: unknown): Promise<{ id: string; username: string }> {
-  if (typeof childId !== 'string' || !/^[0-9a-f-]{36}$/i.test(childId)) throw new HttpError(400, 'Filho inválido.');
+  if (typeof childId !== 'string' || !/^[0-9a-f-]{36}$/i.test(childId)) throw new HttpError(400, 'Membro inválido.');
   const rows = await table<{ id: string; username: string }>(`profiles?id=eq.${childId}&parent_id=eq.${parentId}&select=id,username`);
-  if (!rows[0]) throw new HttpError(404, 'Filho não encontrado.');
+  if (!rows[0]) throw new HttpError(404, 'Membro não encontrado.');
   return rows[0];
 }
 
@@ -92,7 +92,7 @@ async function createChild(parent: string, b: any) {
   const password = validatePassword(b.password);
 
   const kids = await table(`profiles?parent_id=eq.${parent}&select=id&limit=${MAX_CHILDREN + 1}`);
-  if (kids.length >= MAX_CHILDREN) throw new HttpError(400, `Limite de ${MAX_CHILDREN} filhos por conta.`);
+  if (kids.length >= MAX_CHILDREN) throw new HttpError(400, `Limite de ${MAX_CHILDREN} membros por conta.`);
   if ((await table(`profiles?username=eq.${username}&select=id`)).length) throw new HttpError(409, 'Esse usuário já está em uso. Escolha outro.');
 
   const r = await svc('/auth/v1/admin/users', { method: 'POST', body: JSON.stringify({ email: childEmail(username), password, email_confirm: true, user_metadata: { role: 'child' } }) });
@@ -100,12 +100,12 @@ async function createChild(parent: string, b: any) {
   if (!r.ok) {
     if (r.status === 422 && String(u?.error_code || u?.msg || '').includes('exists')) throw new HttpError(409, 'Esse usuário já está em uso. Escolha outro.');
     if (String(u?.error_code || '') === 'weak_password') throw new HttpError(400, 'Senha muito fraca. Use pelo menos 6 caracteres.');
-    throw new HttpError(500, 'Não foi possível criar a conta do filho.');
+    throw new HttpError(500, 'Não foi possível criar a conta do membro.');
   }
   const p = await svc('/rest/v1/profiles', { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ id: u.id, role: 'child', full_name: name, username, age, parent_id: parent }) });
   if (!p.ok) {
     await svc(`/auth/v1/admin/users/${u.id}`, { method: 'DELETE' });
-    throw new HttpError(500, 'Não foi possível salvar o perfil do filho.');
+    throw new HttpError(500, 'Não foi possível salvar o perfil do membro.');
   }
   return { id: u.id, name, age, username };
 }
