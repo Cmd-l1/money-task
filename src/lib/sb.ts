@@ -249,7 +249,14 @@ export async function rpc<T = any>(name: string, args: Record<string, unknown> =
 export async function adminAction<T = any>(action: string, payload: Record<string, unknown> = {}): Promise<T> {
   cache.clear();
   try {
-    const res = await authed('/functions/v1/admin', { method: 'POST', body: JSON.stringify({ action, ...payload }) });
+    let res: Response;
+    try {
+      res = await authed('/functions/v1/admin', { method: 'POST', body: JSON.stringify({ action, ...payload }) });
+    } catch (e) {
+      if (e instanceof AppError && e.message.startsWith('Sem conexão') && navigator.onLine)
+        throw new AppError('Não consegui falar com a função "admin" do Supabase. Confira se ela foi criada com esse nome exato e se "Verify JWT" está desligado (veja supabase/LEIA-ME.md).');
+      throw e;
+    }
     const body = await parse(res);
     if (res.status === 404) throw new AppError('A função de servidor ainda não foi ativada no Supabase. Veja supabase/LEIA-ME.md.');
     if (!res.ok) throw new AppError(typeof body?.error === 'string' ? body.error : friendly(res.status, body, 'Não foi possível concluir a ação. Tente de novo.'));
