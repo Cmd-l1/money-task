@@ -1,9 +1,10 @@
 name: Manter o Supabase ativo
 
-# O plano gratuito pausa projetos sem atividade por ~7 dias. Esta chamada diária evita isso.
+# O plano gratuito pausa projetos sem atividade por ~7 dias. Esta chamada a cada 12 h consulta o banco
+# de verdade (não só o serviço de login) para contar como atividade.
 on:
   schedule:
-    - cron: '17 9 * * *'
+    - cron: '17 9,21 * * *'
   workflow_dispatch:
 
 jobs:
@@ -11,5 +12,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - run: |
-          curl -fsS "https://hvdsntlamtkrbuckhdvk.supabase.co/auth/v1/health" \
-            -H "apikey: sb_publishable_6NZSGB6GeINkrq5ym8dMYQ_GTkrHjP3" && echo "Supabase ativo"
+          URL="https://hvdsntlamtkrbuckhdvk.supabase.co"
+          KEY="sb_publishable_6NZSGB6GeINkrq5ym8dMYQ_GTkrHjP3"
+          curl -fsS "$URL/auth/v1/health" -H "apikey: $KEY" > /dev/null
+          # basta a consulta chegar ao banco; a resposta pode ser vazia por causa da segurança (RLS)
+          curl -sS -o /dev/null -w "Consulta ao banco: HTTP %{http_code}\n" "$URL/rest/v1/achievements?select=code&limit=1" -H "apikey: $KEY" -H "Authorization: Bearer $KEY"
