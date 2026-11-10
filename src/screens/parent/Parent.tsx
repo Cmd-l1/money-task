@@ -22,7 +22,7 @@ export function ParentLayout({ active, children }: { active: string; children: R
   );
 }
 
-const Av = ({ c }: { c: Child }) => <div className="avatar">{c.name[0].toUpperCase()}</div>;
+const Av = ({ c, size }: { c: Child; size?: number }) => <div className="avatar" style={{ fontWeight: 700, fontSize: size ? 18 : 17, ...(size ? { width: size, height: size } : {}) }}>{c.name[0].toUpperCase()}</div>;
 const repeatLabel = (r: Repeat) => (r === 'daily' ? 'Diária' : r === 'weekly' ? 'Semanal' : 'Uma vez');
 
 // ---------- início ----------
@@ -38,22 +38,35 @@ export function ParentHome() {
       <div className="row between">
         <div className="col" style={{ gap: 0 }}>
           <h1 className="t-l">Olá, responsável!</h1>
-          <span className="muted t-body">Resumo da sua família hoje</span>
+          <span className="muted t-cap">{kids.length === 0 ? 'Crie a jornada de aprendizado dos seus filhos' : 'Resumo da sua família hoje'}</span>
         </div>
-        <button className="back" onClick={() => navigate('/pai/aprovacoes')} aria-label="Aprovações pendentes" style={{ position: 'relative' }}>
-          <Icon name="bell" size={20} />
-          {pend.length > 0 && <span style={{ position: 'absolute', top: 6, right: 6, width: 10, height: 10, borderRadius: 5, background: 'var(--destructive)' }} />}
-        </button>
+        {kids.length > 0 && (
+          <button className="back" onClick={() => navigate('/pai/aprovacoes')} aria-label="Aprovações pendentes">
+            <Icon name="bell" size={20} />
+          </button>
+        )}
       </div>
+      {kids.length === 0 && (
+        <div className="alert promo stack">
+          <div className="row" style={{ alignItems: 'flex-start' }}>
+            <span className="alert-icon"><Icon name="users" size={22} /></span>
+            <div className="alert-body">
+              <span className="alert-title">Quer ver o app em ação?</span>
+              <span className="alert-desc">Explore o modo demonstração com dados de exemplo. Nada é salvo.</span>
+            </div>
+          </div>
+          <Button className="btn-block-sm" onClick={() => navigate('/demo')}>Explorar demonstração</Button>
+        </div>
+      )}
 
       {first ? (
-        <button className="alert warning" style={{ textAlign: 'left', width: '100%' }} onClick={() => navigate('/pai/aprovacoes')}>
-          <span className="tile sm" style={{ background: 'var(--warning)' }}><Icon name="clock" size={18} /></span>
+        <button className="alert warning" style={{ textAlign: 'left', width: '100%', borderColor: 'var(--warning)', borderRadius: 16, padding: 14, background: 'rgba(253, 253, 147, 0.12)' }} onClick={() => navigate('/pai/aprovacoes')}>
+          <span className="tile md warn"><Icon name="clock" size={22} /></span>
           <span className="alert-body">
-            <span className="alert-title">{pend.length === 1 ? '1 tarefa para aprovar' : `${pend.length} tarefas para aprovar`}</span>
+            <span className="alert-title" style={{ fontSize: 15, fontWeight: 700 }}>{pend.length === 1 ? '1 tarefa para aprovar' : `${pend.length} tarefas para aprovar`}</span>
             <span className="alert-desc">{first.child?.name} enviou “{first.task?.title}”</span>
           </span>
-          <Icon name="chevron" size={18} />
+          <Icon name="chevron" size={20} />
         </button>
       ) : kids.length > 0 ? (
         <Alert icon="check" title="Tudo em dia">Nenhuma tarefa aguardando sua aprovação.</Alert>
@@ -69,15 +82,15 @@ export function ParentHome() {
         <Empty icon="users" title="Nenhum membro no momento" text="Adicione seu primeiro filho para começar a criar tarefas e recompensas." action={<Button icon="plus" onClick={() => navigate('/pai/membros/novo')}>Adicionar membro</Button>} />
       ) : (
         <>
-          <h2 className="t-s">Membros</h2>
+          <h2 className="t-h">Membros</h2>
           {kids.map((c) => (
-            <button key={c.id} className="card tight clickable row" style={{ textAlign: 'left', width: '100%' }} onClick={() => navigate(`/pai/membros/${c.id}`)}>
+            <button key={c.id} className="card tight clickable row" style={{ textAlign: 'left', width: '100%', padding: '12px 14px' }} onClick={() => navigate(`/pai/membros/${c.id}`)}>
               <Av c={c} />
               <div className="col grow" style={{ gap: 0 }}>
-                <b className="t-h">{c.name} · {c.age} anos</b>
+                <b className="semi" style={{ fontSize: 14 }}>{c.name} · {c.age} anos</b>
                 <span className="muted t-cap">@{c.username}</span>
               </div>
-              <b className="mint t-h">{c.balance.toLocaleString('pt-BR')} XP</b>
+              <b className="mint" style={{ fontSize: 15 }}>{c.balance.toLocaleString('pt-BR')} XP</b>
             </button>
           ))}
         </>
@@ -92,35 +105,88 @@ export function ParentHome() {
 }
 
 // ---------- membros ----------
+function ResetPasswordSheet({ child, open, onClose }: { child: Child; open: boolean; onClose: () => void }) {
+  const [np, setNp] = useState('');
+  const [np2, setNp2] = useState('');
+  const [err, setErr] = useState('');
+  const close = () => { setNp(''); setNp2(''); setErr(''); onClose(); };
+  return (
+    <Sheet open={open} onClose={close}>
+      <h2 className="t-m" style={{ textAlign: 'center' }}>Nova senha do {child.name}</h2>
+      <p className="muted t-cap" style={{ textAlign: 'center' }}>Ele precisará usar a nova senha no próximo acesso.</p>
+      <Field label="Nova senha" error={err}><PasswordInput placeholder="Mínimo de 6 caracteres" value={np} onChange={(e) => setNp(e.target.value)} /></Field>
+      <Field label="Confirmar senha"><PasswordInput placeholder="Repita a senha" value={np2} onChange={(e) => setNp2(e.target.value)} /></Field>
+      <Button onClick={async () => {
+        if (np.length < 6) return setErr('Mínimo de 6 caracteres.');
+        if (np !== np2) return setErr('As senhas não coincidem.');
+        setErr('');
+        if (await run(() => api.resetChildPassword(child.id, np), 'Senha redefinida.')) close();
+      }}>Salvar nova senha</Button>
+      <Button variant="outline" onClick={close}>Cancelar</Button>
+    </Sheet>
+  );
+}
+
+function RemoveChildSheet({ child, open, onClose, onDone }: { child: Child; open: boolean; onClose: () => void; onDone: () => void }) {
+  return (
+    <Sheet open={open} onClose={onClose}>
+      <div className="tile lg danger icon-top"><Icon name="alert" size={26} /></div>
+      <h2 className="t-m" style={{ textAlign: 'center' }}>Remover o {child.name}?</h2>
+      <p className="muted t-cap" style={{ textAlign: 'center' }}>O histórico de XP, tarefas e resgates dele será apagado e não poderá ser recuperado.</p>
+      <Button variant="danger" icon="trash" onClick={async () => { if (await run(() => api.removeChild(child.id), 'Membro removido.')) { onClose(); onDone(); } }}>Remover membro</Button>
+      <Button variant="outline" onClick={onClose}>Cancelar</Button>
+    </Sheet>
+  );
+}
+
 export function Members() {
   const { data: kids } = useData(() => api.children());
+  const { data: pend } = useData(() => api.submissions('pending'));
+  const [pw, setPw] = useState<Child | null>(null);
+  const [rm, setRm] = useState<Child | null>(null);
   return (
     <ParentLayout active="membros">
-      <div className="row between">
-        <div className="col" style={{ gap: 2 }}>
-          <h1 className="t-l">Membros</h1>
-          <span className="muted t-body">Adicione ou remova membros</span>
-        </div>
-        {kids && kids.length > 0 && <button className="back" onClick={() => navigate('/pai/membros/novo')} aria-label="Adicionar membro"><Icon name="plus" size={20} /></button>}
+      <div className="col" style={{ gap: 2 }}>
+        <h1 className="t-l">Membros</h1>
+        <span className="muted t-cap">Adicione ou remova membros</span>
       </div>
-      <Alert icon="info" title="Dica">O membro entra com o usuário e a senha que você definir. Não precisa de e-mail.</Alert>
       {!kids ? <Loading /> : kids.length === 0 ? (
         <>
-          <Empty icon="users" title="Ainda não há membros na família" text="Cadastre o perfil do membro para ele começar a ganhar XP." />
+          <Alert icon="info" title="Dica">O filho entra com o usuário e a senha que você definir. Não precisa de e-mail.</Alert>
+          <Empty icon="users" title="Ainda não há membros na família" text="" />
           <Button icon="plus" onClick={() => navigate('/pai/membros/novo')}>Adicionar membro</Button>
         </>
       ) : (
-        kids.map((c) => (
-          <button key={c.id} className="card tight clickable row" style={{ textAlign: 'left', width: '100%' }} onClick={() => navigate(`/pai/membros/${c.id}`)}>
-            <Av c={c} />
-            <div className="col grow" style={{ gap: 0 }}>
-              <b className="t-h">{c.name} · {c.age} anos</b>
-              <span className="muted t-cap">@{c.username} · Nível {c.level}</span>
-            </div>
-            <Icon name="chevron" size={18} className="dim" />
-          </button>
-        ))
+        <>
+          {kids.map((c) => {
+            const n = (pend || []).filter((x) => x.childId === c.id).length;
+            return (
+              <div key={c.id} className="card bordered col" style={{ gap: 12, padding: 14 }}>
+                <button className="row" style={{ textAlign: 'left', width: '100%' }} onClick={() => navigate(`/pai/membros/${c.id}`)}>
+                  <Av c={c} size={44} />
+                  <div className="col grow" style={{ gap: 0 }}>
+                    <b className="bold" style={{ fontSize: 15 }}>{c.name} · {c.age} anos</b>
+                    <span className="muted t-cap">@{c.username}</span>
+                  </div>
+                  <span className="badge" style={{ height: 'auto', padding: '5px 10px', fontSize: 12, fontWeight: 600 }}>Nível {c.level}</span>
+                </button>
+                <div className="mini-metrics">
+                  <div><span className="muted t-cap-s">Saldo</span><b className="mint" style={{ fontSize: 15 }}>{c.balance.toLocaleString('pt-BR')} XP</b></div>
+                  <div><span className="muted t-cap-s">Pendentes</span><b style={{ fontSize: 15 }}>{n} {n === 1 ? 'tarefa' : 'tarefas'}</b></div>
+                </div>
+                <div className="mini-actions">
+                  <button onClick={() => navigate(`/pai/membros/${c.id}/editar`)}><Icon name="edit" size={14} /> Editar</button>
+                  <button onClick={() => setPw(c)}><Icon name="key" size={14} /> Nova senha</button>
+                  <button className="del" onClick={() => setRm(c)}><Icon name="trash" size={14} /> Remover</button>
+                </div>
+              </div>
+            );
+          })}
+          <Button variant="outline" icon="plus" style={{ borderColor: 'var(--ring)', color: 'var(--primary)' }} onClick={() => navigate('/pai/membros/novo')}>Adicionar membro</Button>
+        </>
       )}
+      {pw && <ResetPasswordSheet child={pw} open onClose={() => setPw(null)} />}
+      {rm && <RemoveChildSheet child={rm} open onClose={() => setRm(null)} onDone={() => setRm(null)} />}
     </ParentLayout>
   );
 }
@@ -148,12 +214,12 @@ export function AddMember() {
   return (
     <div className="screen pad-bottom-actions">
       <TopBar title="Adicionar membro" />
-      <Field label="Nome do membro" error={err.name}><TextInput placeholder="Ex.: Lucas" value={f.name} onChange={(e) => set('name', e.target.value)} invalid={!!err.name} /></Field>
+      <Field label="Nome do filho(a)" error={err.name}><TextInput placeholder="Ex.: Lucas" value={f.name} onChange={(e) => set('name', e.target.value)} invalid={!!err.name} /></Field>
       <Field label="Idade" error={err.age} hint="De 7 a 18 anos. A idade define o conteúdo do app.">
         <TextInput inputMode="numeric" placeholder="Ex.: 14" value={f.age} onChange={(e) => set('age', e.target.value.replace(/\D/g, '').slice(0, 2))} invalid={!!err.age} />
       </Field>
-      <h2 className="t-h mint" style={{ marginTop: 4 }}>Acesso do membro</h2>
-      <Field label="Nome de usuário" error={err.username} hint="Sem espaços. É com ele que o membro entra.">
+      <h2 className="t-h mint" style={{ marginTop: 4 }}>Acesso do filho(a)</h2>
+      <Field label="Nome de usuário" error={err.username} hint="Sem espaços. É com ele que seu filho entra.">
         <TextInput autoCapitalize="none" autoCorrect="off" placeholder="Ex.: lucas14" value={f.username} onChange={(e) => set('username', e.target.value.toLowerCase().replace(/\s/g, ''))} invalid={!!err.username} />
       </Field>
       <Field label="Senha" error={err.pass}><PasswordInput placeholder="Mínimo de 6 caracteres" value={f.pass} onChange={(e) => set('pass', e.target.value)} /></Field>
@@ -209,8 +275,6 @@ export function EditMember({ id }: { id: string }) {
   const { data: c } = useData(() => api.child(id), [id]);
   const [f, setF] = useState<{ name: string; age: string; username: string } | null>(null);
   const [pw, setPw] = useState(false);
-  const [rm, setRm] = useState(false);
-  const [np, setNp] = useState('');
   const [busy, setBusy] = useState(false);
   if (!c) return <div className="screen"><TopBar title="Editar membro" /><Loading /></div>;
   const v = f || { name: c.name, age: String(c.age), username: c.username };
@@ -224,27 +288,12 @@ export function EditMember({ id }: { id: string }) {
   return (
     <div className="screen pad-bottom-actions">
       <TopBar title="Editar membro" />
-      <Field label="Nome do membro"><TextInput value={v.name} onChange={(e) => set('name', e.target.value)} /></Field>
+      <Field label="Nome do filho(a)"><TextInput value={v.name} onChange={(e) => set('name', e.target.value)} /></Field>
       <Field label="Idade"><TextInput inputMode="numeric" value={v.age} onChange={(e) => set('age', e.target.value.replace(/\D/g, '').slice(0, 2))} /></Field>
-      <Field label="Nome de usuário" hint="Mudar o usuário exige que o membro entre de novo."><TextInput autoCapitalize="none" value={v.username} onChange={(e) => set('username', e.target.value.toLowerCase().replace(/\s/g, ''))} /></Field>
+      <Field label="Nome de usuário" hint="Mudar o usuário exige que o filho entre de novo."><TextInput autoCapitalize="none" value={v.username} onChange={(e) => set('username', e.target.value.toLowerCase().replace(/\s/g, ''))} /></Field>
       <Button variant="outline" icon="key" onClick={() => setPw(true)}>Redefinir senha</Button>
-      <Button variant="danger-outline" icon="trash" onClick={() => setRm(true)}>Remover membro</Button>
       <div className="footer-actions"><Button disabled={busy} onClick={save}>Salvar alterações</Button></div>
-
-      <Sheet open={pw} onClose={() => setPw(false)}>
-        <div className="tile lg icon-top"><Icon name="key" size={26} /></div>
-        <h2 className="t-m" style={{ textAlign: 'center' }}>Nova senha de {c.name}</h2>
-        <PasswordInput placeholder="Mínimo de 6 caracteres" value={np} onChange={(e) => setNp(e.target.value)} />
-        <Button onClick={async () => { if (await run(() => api.resetChildPassword(id, np), 'Senha redefinida.')) { setPw(false); setNp(''); } }}>Redefinir</Button>
-        <Button variant="outline" onClick={() => setPw(false)}>Cancelar</Button>
-      </Sheet>
-      <Sheet open={rm} onClose={() => setRm(false)}>
-        <div className="tile lg danger icon-top"><Icon name="trash" size={26} /></div>
-        <h2 className="t-m" style={{ textAlign: 'center' }}>Remover {c.name}?</h2>
-        <p className="muted" style={{ textAlign: 'center' }}>Todo o histórico de XP, tarefas e resgates será apagado. Isso não pode ser desfeito.</p>
-        <Button variant="danger" onClick={async () => { if (await run(() => api.removeChild(id), 'Membro removido.')) navigate('/pai/membros', true); }}>Remover membro</Button>
-        <Button variant="outline" onClick={() => setRm(false)}>Cancelar</Button>
-      </Sheet>
+      <ResetPasswordSheet child={c} open={pw} onClose={() => setPw(false)} />
     </div>
   );
 }
@@ -262,6 +311,7 @@ export function ParentTasks() {
   const { data: kids } = useData(() => api.children());
   const [who, setWho] = useState('all');
   const [tpl, setTpl] = useState(false);
+  const [del, setDel] = useState<{ id: string; title: string; child: string } | null>(null);
   if (!tasks || !kids) return <ParentLayout active="tarefas"><Loading /></ParentLayout>;
   const list = tasks.filter((t) => who === 'all' || t.childId === who || t.childId === 'all');
   const nameOf = (id: string) => (id === 'all' ? 'Todos' : kids.find((k) => k.id === id)?.name || '—');
@@ -270,9 +320,9 @@ export function ParentTasks() {
       <div className="row between">
         <div className="col" style={{ gap: 2 }}>
           <h1 className="t-l">Tarefas</h1>
-          <span className="muted t-body">{tasks.length === 0 ? 'Crie e gerencie as tarefas' : `${tasks.length} ${tasks.length === 1 ? 'tarefa ativa' : 'tarefas ativas'}`}</span>
+          <span className="muted t-cap">{tasks.length === 0 ? 'Crie e gerencie as tarefas' : `${tasks.length} ${tasks.length === 1 ? 'tarefa ativa' : 'tarefas ativas'}`}</span>
         </div>
-        <button className="back" onClick={() => navigate('/pai/tarefas/nova')} aria-label="Nova tarefa"><Icon name="plus" size={20} /></button>
+        {tasks.length > 0 && <button className="round-add" onClick={() => navigate('/pai/tarefas/nova')} aria-label="Nova tarefa"><Icon name="plus" size={20} /></button>}
       </div>
       {tasks.length === 0 ? (
         <>
@@ -286,20 +336,34 @@ export function ParentTasks() {
             {kids.map((k) => <Chip key={k.id} active={who === k.id} onClick={() => setWho(k.id)}>{k.name}</Chip>)}
           </div>
           {list.map((t) => (
-            <div key={t.id} className="card col" style={{ gap: 10 }}>
+            <div key={t.id} className="card col" style={{ gap: 10, padding: 14, borderRadius: 14 }}>
               <div className="row">
-                <div className="tile"><Icon name={t.icon} size={22} /></div>
-                <div className="col grow" style={{ gap: 0, minWidth: 0 }}><b className="t-h">{t.title}</b><span className="muted t-cap">{t.description}</span></div>
+                <div className="tile md"><Icon name={t.icon} size={22} /></div>
+                <div className="col grow" style={{ gap: 0, minWidth: 0 }}><b className="bold" style={{ fontSize: 15 }}>{t.title}</b><span className="muted t-cap">{t.description}</span></div>
                 <span className="badge">+{t.xp} XP</span>
               </div>
               <div className="row between">
                 <div className="chips"><Chip icon="user">{nameOf(t.childId)}</Chip><Chip icon="clock">{repeatLabel(t.repeat)}</Chip>{t.needsPhoto && <Chip icon="camera">Foto</Chip>}{t.groupId && <Chip icon="users">Conjunta</Chip>}{t.dueAt && <Chip icon="clock" tone={t.dueAt < Date.now() ? 'late' : undefined}>{t.dueAt < Date.now() ? 'Prazo vencido' : `Até ${deadlineText(t.dueAt)}`}</Chip>}{!!t.penalty && <Chip tone="warn">−{t.penalty} XP</Chip>}</div>
-                <button className="back" style={{ width: 36, height: 36 }} onClick={() => navigate(`/pai/tarefas/${t.id}`)} aria-label={`Editar ${t.title}`}><Icon name="edit" size={16} /></button>
+                <div className="row" style={{ gap: 0, flex: 'none' }}>
+                  <button className="icon-btn" onClick={() => navigate(`/pai/tarefas/${t.id}`)} aria-label={`Editar ${t.title}`}><Icon name="edit" size={18} /></button>
+                  <button className="icon-btn del" onClick={() => setDel({ id: t.id, title: t.title, child: nameOf(t.childId) })} aria-label={`Excluir ${t.title}`}><Icon name="trash" size={18} /></button>
+                </div>
               </div>
             </div>
           ))}
         </>
       )}
+      <Sheet open={!!del} onClose={() => setDel(null)}>
+        {del && (
+          <>
+            <div className="tile lg danger icon-top"><Icon name="trash" size={26} /></div>
+            <h2 className="t-m" style={{ textAlign: 'center' }}>Excluir tarefa?</h2>
+            <p className="muted t-cap" style={{ textAlign: 'center' }}>“{del.title}” deixa de aparecer para {del.child === 'Todos' ? 'seus filhos' : `o ${del.child}`}. O XP já ganho continua no saldo.</p>
+            <Button variant="danger" onClick={async () => { if (await run(() => api.deleteTask(del.id), 'Tarefa excluída.')) setDel(null); }}>Excluir tarefa</Button>
+            <Button variant="outline" onClick={() => setDel(null)}>Cancelar</Button>
+          </>
+        )}
+      </Sheet>
       <Sheet open={tpl} onClose={() => setTpl(false)}>
         <h2 className="t-m">Modelos de tarefa</h2>
         {TEMPLATES.map((t, i) => (
@@ -319,7 +383,6 @@ export function TaskForm({ id }: { id?: string }) {
   const m = TEMPLATES[parseInt(currentQuery().get('modelo') || '-1', 10)];
   const [f, setF] = useState<{ title: string; description: string; xp: string; childIds: string[]; repeat: Repeat; needsPhoto: boolean; joint: boolean; dueAt: number | null; penalty: string } | null>(null);
   const [err, setErr] = useState<Record<string, string>>({});
-  const [del, setDel] = useState(false);
   const [busy, setBusy] = useState(false);
   if (!kids || (id && !existing)) return <div className="screen"><TopBar title={id ? 'Editar tarefa' : 'Criar tarefa'} /><Loading /></div>;
   const v =
@@ -333,7 +396,7 @@ export function TaskForm({ id }: { id?: string }) {
     const xp = parseInt(v.xp, 10);
     if (!v.title.trim()) e.title = 'Informe o título.';
     if (!(xp > 0 && xp <= 5000)) e.xp = 'Digite um valor de 1 a 5000.';
-    if (!v.childIds.length) e.child = kids.length ? 'Escolha pelo menos um membro.' : 'Adicione um membro antes de criar tarefas.';
+    if (!v.childIds.length) e.child = kids.length ? 'Escolha pelo menos um filho.' : 'Adicione um membro antes de criar tarefas.';
     const penalty = parseInt(v.penalty || '0', 10) || 0;
     const dueAt = v.repeat === 'once' ? v.dueAt : null;
     if (dueAt && !id && dueAt < Date.now()) e.due = 'Escolha uma data e hora no futuro.';
@@ -350,20 +413,19 @@ export function TaskForm({ id }: { id?: string }) {
       <TopBar title={id ? 'Editar tarefa' : 'Criar tarefa'} onBack={() => navigate('/pai/tarefas')} />
       <Field label="Título" error={err.title}><TextInput placeholder="Ex.: Arrumar o quarto" value={v.title} onChange={(e) => set({ title: e.target.value })} invalid={!!err.title} /></Field>
       <Field label="Descrição (opcional)"><textarea className="textarea" placeholder="Explique o que precisa ser feito" value={v.description} onChange={(e) => set({ description: e.target.value })} /></Field>
-      <Field label="Valor em XP" error={err.xp}>
-        <div className="row">
+      <div className="row" style={{ alignItems: 'flex-end', gap: 12 }}>
+        <div className="grow"><Field label="Valor em XP" error={err.xp}>
           <TextInput inputMode="numeric" value={v.xp} onChange={(e) => set({ xp: e.target.value.replace(/\D/g, '').slice(0, 4) })} invalid={!!err.xp} />
-          {[50, 100, 200].map((n) => <Chip key={n} onClick={() => set({ xp: String(n) })} active={v.xp === String(n)}>{n}</Chip>)}
-        </div>
-      </Field>
-      <Field label={id ? 'Para quem?' : 'Para quem? (pode escolher mais de um)'} error={err.child}>
+        </Field></div>
+        <div className="chips" style={{ flexWrap: 'nowrap' }}>{[50, 100, 200].map((n) => <Chip key={n} onClick={() => set({ xp: String(n) })} active={v.xp === String(n)}>{n}</Chip>)}</div>
+      </div>
+      <Field label="Para quem?" error={err.child}>
         <div className="chips">
           {id
-            ? <Chip active icon="user">{kids.find((k) => k.id === v.childIds[0])?.name || '—'}</Chip>
+            ? <Chip active>{kids.find((k) => k.id === v.childIds[0])?.name || '—'}</Chip>
             : (
               <>
                 {kids.map((k) => <Chip key={k.id} active={v.childIds.includes(k.id)} onClick={() => set({ childIds: v.childIds.includes(k.id) ? v.childIds.filter((x) => x !== k.id) : [...v.childIds, k.id] })}>{k.name}</Chip>)}
-                {kids.length > 1 && <Chip active={v.childIds.length === kids.length} onClick={() => set({ childIds: v.childIds.length === kids.length ? [] : kids.map((k) => k.id) })}>Todos</Chip>}
               </>
             )}
         </div>
@@ -371,7 +433,7 @@ export function TaskForm({ id }: { id?: string }) {
       {!id && v.childIds.length > 1 && (
         <div className="card tight row">
           <div className="tile dark sm"><Icon name="users" size={16} /></div>
-          <div className="col grow" style={{ gap: 0 }}><b className="t-label">Tarefa conjunta</b><span className="muted t-cap">O grupo faz junto; cada membro ganha o XP ao concluir a sua parte.</span></div>
+          <div className="col grow" style={{ gap: 0 }}><b className="t-label">Tarefa conjunta</b><span className="muted t-cap">O grupo faz junto; cada filho ganha o XP ao concluir a sua parte.</span></div>
           <Switch on={v.joint} onChange={(b) => set({ joint: b })} label="Tarefa conjunta" />
         </div>
       )}
@@ -380,14 +442,14 @@ export function TaskForm({ id }: { id?: string }) {
       </Field>
       {v.repeat === 'once' && (
         <>
-          <Field label="Prazo para fazer (opcional)" error={err.due} hint="Depois desse horário o membro não consegue mais enviar a tarefa.">
+          <Field label="Prazo para fazer (opcional)" error={err.due} hint="Depois desse horário o filho não consegue mais enviar a tarefa.">
             <div className="row">
               <div className="grow"><DateTimeInput label="Prazo da tarefa" value={v.dueAt} onChange={(ms) => set({ dueAt: ms })} invalid={!!err.due} /></div>
               {v.dueAt && <button type="button" className="back" style={{ width: 40, height: 40 }} onClick={() => set({ dueAt: null, penalty: '0' })} aria-label="Remover prazo"><Icon name="x" size={16} /></button>}
             </div>
           </Field>
           {v.dueAt && (
-            <Field label="XP perdido se o prazo passar" hint="Descontado automaticamente do saldo do membro, uma vez. Deixe 0 para não descontar.">
+            <Field label="XP perdido se o prazo passar" hint="Descontado automaticamente do saldo do filho, uma vez. Deixe 0 para não descontar.">
               <div className="row">
                 <TextInput inputMode="numeric" aria-label="XP perdido" value={v.penalty} onChange={(e) => set({ penalty: e.target.value.replace(/\D/g, '').slice(0, 4) })} />
                 {[25, 50, 100].map((n) => <Chip key={n} onClick={() => set({ penalty: String(n) })} active={v.penalty === String(n)}>{n}</Chip>)}
@@ -396,20 +458,12 @@ export function TaskForm({ id }: { id?: string }) {
           )}
         </>
       )}
-      <div className="card tight row">
-        <div className="tile dark sm"><Icon name="camera" size={16} /></div>
-        <div className="col grow" style={{ gap: 0 }}><b className="t-label">Pedir foto como prova</b><span className="muted t-cap">O membro envia uma foto ao concluir.</span></div>
+      <div className="card tight row" style={{ padding: '12px 14px' }}>
+        <span className="mint"><Icon name="camera" size={22} /></span>
+        <div className="col grow" style={{ gap: 0 }}><b className="semi" style={{ fontSize: 14 }}>Pedir foto como prova</b><span className="muted t-cap-s">O filho envia uma foto ao concluir.</span></div>
         <Switch on={v.needsPhoto} onChange={(b) => set({ needsPhoto: b })} label="Pedir foto como prova" />
       </div>
-      {id && <Button variant="danger-outline" icon="trash" onClick={() => setDel(true)}>Excluir tarefa</Button>}
       <div className="footer-actions"><Button disabled={busy} onClick={save}>{id ? 'Salvar alterações' : 'Salvar tarefa'}</Button></div>
-      <Sheet open={del} onClose={() => setDel(false)}>
-        <div className="tile lg danger icon-top"><Icon name="trash" size={26} /></div>
-        <h2 className="t-m" style={{ textAlign: 'center' }}>Excluir tarefa?</h2>
-        <p className="muted" style={{ textAlign: 'center' }}>“{v.title}” deixará de aparecer para o membro. O XP já ganho continua.</p>
-        <Button variant="danger" onClick={async () => { if (await run(() => api.deleteTask(id!), 'Tarefa excluída.')) navigate('/pai/tarefas', true); }}>Excluir</Button>
-        <Button variant="outline" onClick={() => setDel(false)}>Cancelar</Button>
-      </Sheet>
     </div>
   );
 }
@@ -420,44 +474,47 @@ export function ParentRewards() {
   const { data: reds } = useData(() => api.redemptionsAll());
   const [tab, setTab] = useState<'ativas' | 'resgatadas'>('ativas');
   if (!rewards || !reds) return <ParentLayout active="loja"><Loading /></ParentLayout>;
-  const pending = reds.filter((r) => r.status === 'pending').length;
   return (
     <ParentLayout active="loja">
       <div className="row between">
-        <div className="col" style={{ gap: 2 }}><h1 className="t-l">Recompensas</h1><span className="muted t-body">Prêmios que o XP pode comprar</span></div>
-        <button className="back" onClick={() => navigate('/pai/recompensas/nova')} aria-label="Nova recompensa"><Icon name="plus" size={20} /></button>
+        <div className="col" style={{ gap: 2 }}><h1 className="t-l">Recompensas</h1><span className="muted t-cap">Prêmios que o XP pode comprar</span></div>
+        {rewards.length > 0 && <button className="round-add" onClick={() => navigate('/pai/recompensas/nova')} aria-label="Nova recompensa"><Icon name="plus" size={20} /></button>}
       </div>
-      <div className="chips">
-        <Chip active={tab === 'ativas'} onClick={() => setTab('ativas')}>Ativas</Chip>
-        <Chip active={tab === 'resgatadas'} onClick={() => setTab('resgatadas')}>Resgatadas · {pending}</Chip>
-      </div>
+      {rewards.length > 0 && (
+        <>
+          <Alert variant="promo" icon="gift" title="Motive com recompensas" action={<Button small onClick={() => navigate('/pai/recompensas/nova')}>Criar</Button>}>Crie uma recompensa de 100 XP, como uma sobremesa.</Alert>
+          <div className="chips">
+            <Chip active={tab === 'ativas'} onClick={() => setTab('ativas')}>Ativas</Chip>
+            <Chip active={tab === 'resgatadas'} onClick={() => setTab('resgatadas')}>Resgatadas · {reds.length}</Chip>
+          </div>
+        </>
+      )}
       {tab === 'ativas' ? (
         rewards.length === 0 ? (
-          <Empty icon="gift" title="Nenhuma recompensa criada" text="Crie prêmios para motivar os membros, como um passeio ou uma sobremesa." action={<Button icon="plus" onClick={() => navigate('/pai/recompensas/nova')}>Criar recompensa</Button>} />
+          <Empty icon="gift" title="Nenhuma recompensa criada" text="Crie prêmios para motivar seus filhos, como um passeio ou um jogo." action={<Button icon="plus" onClick={() => navigate('/pai/recompensas/nova')}>Criar recompensa</Button>} />
         ) : (
           <>
-            <Alert variant="promo" icon="gift" title="Motive com recompensas" action={<Button small onClick={() => navigate('/pai/recompensas/nova')}>Criar</Button>}>Crie uma de 100 XP, como uma sobremesa.</Alert>
             {rewards.map((r) => (
               <div key={r.id} className="card tight row">
-                <div className="tile"><Icon name={r.icon} size={22} /></div>
-                <div className="col grow" style={{ gap: 0, minWidth: 0 }}><b className="t-h">{r.title}</b><span className="muted t-cap">{r.description}</span>{r.expiresAt && <span style={{ marginTop: 6 }}><Chip icon="clock" tone={r.expiresAt < Date.now() ? 'late' : undefined}>{r.expiresAt < Date.now() ? 'Encerrada' : `Até ${deadlineText(r.expiresAt)}`}</Chip></span>}</div>
+                <div className="tile md"><Icon name={r.icon} size={22} /></div>
+                <div className="col grow" style={{ gap: 0, minWidth: 0 }}><b className="bold" style={{ fontSize: 15 }}>{r.title}</b><span className="muted t-cap">{r.description}</span>{r.expiresAt && <span style={{ marginTop: 6 }}><Chip icon="clock" tone={r.expiresAt < Date.now() ? 'late' : undefined}>{r.expiresAt < Date.now() ? 'Encerrada' : `Até ${deadlineText(r.expiresAt)}`}</Chip></span>}</div>
                 <span className="badge">{r.cost} XP</span>
-                <button className="back" style={{ width: 34, height: 34 }} onClick={() => navigate(`/pai/recompensas/${r.id}`)} aria-label={`Editar ${r.title}`}><Icon name="edit" size={15} /></button>
+                <button className="icon-btn" onClick={() => navigate(`/pai/recompensas/${r.id}`)} aria-label={`Editar ${r.title}`}><Icon name="edit" size={18} /></button>
               </div>
             ))}
           </>
         )
       ) : reds.length === 0 ? (
-        <Empty icon="gift" title="Nenhum resgate ainda" text="Quando os membros trocarem XP por prêmios, você vê aqui." />
+        <Empty icon="gift" title="Nenhum resgate ainda" text="Quando seus filhos trocarem XP por prêmios, você vê aqui." />
       ) : (
         reds.map((x) => (
           <div key={x.id} className="card col" style={{ gap: 10 }}>
             <div className="row">
-              <div className="tile"><Icon name={x.reward?.icon || 'gift'} size={22} /></div>
-              <div className="col grow" style={{ gap: 0 }}><b className="t-h">{x.reward?.title || 'Recompensa'}</b><span className="muted t-cap">{x.child?.name} · {when(x.createdAt)} · {x.cost} XP</span></div>
-              {x.status === 'delivered' && <span className="badge soft">Entregue</span>}
+              <div className="tile md"><Icon name={x.reward?.icon || 'gift'} size={22} /></div>
+              <div className="col grow" style={{ gap: 0 }}><b className="bold" style={{ fontSize: 15 }}>{x.reward?.title || 'Recompensa'}</b><span className="muted t-cap">{x.child?.name} · {when(x.createdAt)} · −{x.cost} XP</span></div>
+              {x.status === 'delivered' ? <span className="badge soft"><Icon name="check" size={14} /> Entregue</span> : <span className="badge warn"><Icon name="clock" size={14} /> Pendente</span>}
             </div>
-            {x.status === 'pending' && <Button small variant="primary" icon="check" onClick={() => run(() => api.markDelivered(x.id), 'Marcado como entregue.')}>Marcar como entregue</Button>}
+            {x.status === 'pending' && <Button variant="primary" icon="check" className="btn-block-sm" onClick={() => run(() => api.markDelivered(x.id), 'Marcado como entregue.')}>Marcar como entregue</Button>}
           </div>
         ))
       )}
@@ -497,7 +554,7 @@ export function RewardForm({ id }: { id?: string }) {
       <Field label="Descrição (opcional)"><textarea className="textarea" placeholder="Detalhes do prêmio" value={v.description} onChange={(e) => set({ description: e.target.value })} /></Field>
       <Field label="Custo em XP" error={err.cost}><TextInput inputMode="numeric" value={v.cost} onChange={(e) => set({ cost: e.target.value.replace(/\D/g, '').slice(0, 5) })} invalid={!!err.cost} /></Field>
       <Field label="Ícone">
-        <div className="chips">{REWARD_ICONS.map((ic) => <button key={ic} className={`tile ${v.icon === ic ? '' : 'dark'}`} style={{ border: v.icon === ic ? 'none' : '1px solid var(--border)' }} onClick={() => set({ icon: ic })} aria-label={`Ícone ${ic}`} aria-pressed={v.icon === ic}><Icon name={ic} size={22} /></button>)}</div>
+        <div className="chips">{REWARD_ICONS.map((ic) => <button key={ic} className={`tile xl ${v.icon === ic ? '' : 'dark'}`} style={{ border: v.icon === ic ? 'none' : '1px solid var(--border)' }} onClick={() => set({ icon: ic })} aria-label={`Ícone ${ic}`} aria-pressed={v.icon === ic}><Icon name={ic} size={22} /></button>)}</div>
       </Field>
       <Field label="Disponível até (opcional)" error={err.exp} hint="Depois desse horário a recompensa some da loja.">
         <div className="row">
@@ -513,8 +570,8 @@ export function RewardForm({ id }: { id?: string }) {
       <Sheet open={del} onClose={() => setDel(false)}>
         <div className="tile lg danger icon-top"><Icon name="trash" size={26} /></div>
         <h2 className="t-m" style={{ textAlign: 'center' }}>Excluir recompensa?</h2>
-        <p className="muted" style={{ textAlign: 'center' }}>Ela some da loja. Resgates já feitos continuam no histórico.</p>
-        <Button variant="danger" onClick={async () => { if (await run(() => api.deleteReward(id!), 'Recompensa excluída.')) navigate('/pai/recompensas', true); }}>Excluir</Button>
+        <p className="muted t-cap" style={{ textAlign: 'center' }}>“{v.title}” será removida da loja dos seus filhos. Resgates já feitos continuam no histórico.</p>
+        <Button variant="danger" onClick={async () => { if (await run(() => api.deleteReward(id!), 'Recompensa excluída.')) navigate('/pai/recompensas', true); }}>Excluir recompensa</Button>
         <Button variant="outline" onClick={() => setDel(false)}>Cancelar</Button>
       </Sheet>
     </div>
@@ -535,17 +592,17 @@ export function Approvals() {
           <button onClick={() => setZoom(null)} aria-label="Fechar"><Icon name="x" size={22} /></button>
         </div>
       )}
+      {okMsg && <Alert variant="success" icon="check" title="Tarefa aprovada">{okMsg}</Alert>}
       <TopBar title="Aprovações pendentes" onBack={() => navigate('/pai')} />
-      {okMsg && <Alert variant="success" icon="check" title="Tarefa aprovada!">{okMsg}</Alert>}
       {!list ? <Loading /> : list.length === 0 ? (
-        <Empty icon="check" title="Tudo em dia" text="Nenhuma tarefa aguardando aprovação." action={<Button variant="outline" onClick={() => navigate('/pai')}>Voltar ao início</Button>} />
+        <Empty icon="check" title="Tudo em dia!" text="Quando seus filhos enviarem tarefas, elas aparecem aqui para você aprovar." />
       ) : (
         <>
           {list.map((s) => (
-            <div key={s.id} className="card col" style={{ gap: 12 }}>
+            <div key={s.id} className="card col" style={{ gap: 12, padding: 14 }}>
               <div className="row">
-                <div className="avatar">{s.child?.name[0]}</div>
-                <div className="col grow" style={{ gap: 0 }}><b className="t-h">{s.task?.title}</b><span className="muted t-cap">{s.child?.name} · {when(s.createdAt)}</span></div>
+                <div className="avatar" style={{ fontWeight: 700 }}>{s.child?.name[0]}</div>
+                <div className="col grow" style={{ gap: 0 }}><b className="bold" style={{ fontSize: 15 }}>{s.task?.title}</b><span className="muted t-cap">{s.child?.name} · {when(s.createdAt)}</span></div>
                 <span className="badge">+{s.task?.xp} XP</span>
               </div>
               {s.photo ? (
@@ -557,12 +614,12 @@ export function Approvals() {
                 <span className="muted t-cap"><Icon name="info" size={13} /> Sem foto anexada</span>
               )}
               <div className="row">
-                <Button variant="danger-outline" icon="x" onClick={() => navigate(`/pai/aprovacoes/${s.id}/recusar`)}>Recusar</Button>
-                <Button icon="check" disabled={busy === s.id} onClick={async () => { setBusy(s.id); const ok = await run(() => api.approve(s.id)); setBusy(null); if (ok) setOkMsg(`+${s.task?.xp} XP creditado para ${s.child?.name}.`); }}>Aprovar</Button>
+                <Button small variant="danger-outline" icon="x" className="grow" style={{ width: '100%' }} onClick={() => navigate(`/pai/aprovacoes/${s.id}/recusar`)}>Recusar</Button>
+                <Button small icon="check" className="grow" style={{ width: '100%' }} disabled={busy === s.id} onClick={async () => { setBusy(s.id); const ok = await run(() => api.approve(s.id)); setBusy(null); if (ok) setOkMsg(`+${s.task?.xp} XP creditados para ${s.child?.name}`); }}>Aprovar</Button>
               </div>
             </div>
           ))}
-          <p className="muted t-cap"><Icon name="info" size={13} /> Ao aprovar, o XP é creditado no saldo do membro na hora.</p>
+          <p className="muted t-cap row" style={{ gap: 8 }}><Icon name="info" size={16} /> Ao aprovar, o XP é creditado no saldo do seu filho na hora.</p>
         </>
       )}
     </div>
@@ -580,7 +637,7 @@ export function Reject({ id }: { id: string }) {
     <div className="screen pad-bottom-actions">
       <TopBar title="Recusar tarefa" onBack={() => navigate('/pai/aprovacoes')} />
       {s && <div className="card row"><div className="tile"><Icon name={s.task?.icon || 'list'} size={22} /></div><div className="col grow" style={{ gap: 0 }}><b className="t-h">{s.task?.title}</b><span className="muted t-cap">{s.child?.name}</span></div></div>}
-      <p className="muted">Conte ao membro o que precisa melhorar. Ele poderá enviar a tarefa de novo.</p>
+      <p className="muted">Conte ao seu filho o que precisa melhorar. Ele poderá enviar a tarefa de novo.</p>
       <div className="chips">{quick.map((q) => <Chip key={q} active={reason === q} onClick={() => setReason(q)}>{q}</Chip>)}</div>
       <Field label="Motivo (opcional)"><textarea className="textarea" placeholder="Ex.: Faltou resolver os últimos exercícios." value={reason} onChange={(e) => setReason(e.target.value)} /></Field>
       <div className="footer-actions">
@@ -597,26 +654,32 @@ export function ParentProfile() {
   const { data: pname } = useData(() => api.parentName());
   const { data: pemail } = useData(() => api.parentEmail());
   const row = (icon: string, label: string, path: string) => (
-    <button className="list-item" onClick={() => navigate(path)}><div className="tile dark sm"><Icon name={icon} size={18} /></div><span className="label">{label}</span><Icon name="chevron" size={16} className="dim" /></button>
+    <button className="list-item" style={{ padding: '12px 14px' }} onClick={() => navigate(path)}>
+      <div className="tile dark" style={{ width: 36, height: 36, borderRadius: 12 }}><Icon name={icon} size={20} /></div>
+      <span className="label" style={{ fontSize: 14 }}>{label}</span>
+      <Icon name="chevron" size={20} className="dim" />
+    </button>
   );
   return (
     <ParentLayout active="perfil">
       <div className="hero" style={{ paddingTop: 8 }}>
-        <div className="avatar xl ring">{(real && pname ? pname[0] : 'R').toUpperCase()}</div>
+        <div className="avatar xl solid" style={{ width: 88, height: 88, fontSize: 37 }}>{(real && pname ? pname[0] : 'R').toUpperCase()}</div>
         <h1 className="t-l">{real && pname ? pname : 'Responsável'}</h1>
-        <span className="muted">{real ? pemail || 'Conta do responsável' : 'Modo demonstração'}</span>
+        <span className="muted t-cap">{real ? pemail || 'Conta do responsável' : 'seuemail@exemplo.com'}</span>
       </div>
-      <div className="card menu">
-        {row('shield', 'Privacidade e dados', '/pai/privacidade')}
+      <div className="card menu" style={{ borderRadius: 16 }}>
+        {row('users', 'Membros da família', '/pai/membros')}
+        {row('shield', 'Privacidade e consentimento (LGPD)', '/pai/privacidade')}
         {row('chart', 'Relatórios', '/pai/relatorios')}
         {row('info', 'Sobre o money task', '/sobre')}
       </div>
-      <InstallBanner />
       {!real && <Button variant="outline" icon="refresh" onClick={() => { api.resetDemo(); toast('Demonstração reiniciada.'); }}>Reiniciar dados da demonstração</Button>}
       <Button variant="danger-outline" icon="logout" onClick={() => setOut(true)}>Sair</Button>
+      <InstallBanner />
       <Sheet open={out} onClose={() => setOut(false)}>
-        <div className="tile lg danger icon-top"><Icon name="logout" size={26} /></div>
+        <div className="tile lg icon-top"><Icon name="logout" size={26} /></div>
         <h2 className="t-m" style={{ textAlign: 'center' }}>Sair da conta?</h2>
+        <p className="muted t-cap" style={{ textAlign: 'center' }}>Você poderá entrar de novo com seu e-mail e senha.</p>
         <Button variant="danger" onClick={async () => { await api.logout(); navigate('/entrar', true); }}>Sair</Button>
         <Button variant="outline" onClick={() => setOut(false)}>Cancelar</Button>
       </Sheet>
@@ -627,6 +690,7 @@ export function ParentProfile() {
 export function Privacy() {
   const [del, setDel] = useState(false);
   const [busyDel, setBusyDel] = useState(false);
+  const [conf, setConf] = useState('');
   const download = async () => {
     const json = await api.exportData();
     const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
@@ -639,20 +703,24 @@ export function Privacy() {
   };
   return (
     <div className="screen">
-      <TopBar title="Privacidade e LGPD" onBack={() => navigate('/pai/perfil')} />
+      <TopBar title="Privacidade e consentimento" onBack={() => navigate('/pai/perfil')} />
       <div className="card col">
-        <b className="t-h">O que guardamos dos membros</b>
-        {['Nome e idade', 'Nome de usuário e senha (protegida)', 'XP, tarefas e resgates'].map((t) => <span key={t} className="muted"><span className="mint"><Icon name="check" size={14} /></span> {t}</span>)}
+        <b className="t-h">O que guardamos dos seus filhos</b>
+        {['Nome e idade', 'Nome de usuário e senha (protegida)', 'XP, tarefas e resgates'].map((t) => <span key={t} className="row" style={{ gap: 8 }}><span className="mint"><Icon name="check" size={16} /></span> {t}</span>)}
       </div>
-      <Alert icon="shield" title="Consentimento registrado">Você autorizou o tratamento dos dados dos membros da família ao criar a conta.</Alert>
+      <div className="card tight row" style={{ padding: '12px 14px' }}>
+        <span className="mint"><Icon name="shield" size={20} /></span>
+        <span className="t-cap">Consentimento dado ao criar a conta.</span>
+      </div>
       <Button variant="outline" icon="download" onClick={download}>Baixar meus dados</Button>
       <Button variant="danger-outline" icon="trash" onClick={() => setDel(true)}>Excluir conta e todos os dados</Button>
       <Sheet open={del} onClose={() => setDel(false)}>
-        <div className="tile lg danger icon-top"><Icon name="trash" size={26} /></div>
-        <h2 className="t-m" style={{ textAlign: 'center' }}>Excluir conta?</h2>
-        <p className="muted" style={{ textAlign: 'center' }}>Todos os dados da família serão apagados e não poderão ser recuperados.</p>
-        <Button variant="danger" disabled={busyDel} onClick={async () => { setBusyDel(true); const ok = await run(() => api.deleteAccount()); setBusyDel(false); if (ok) navigate('/entrar', true); }}>{busyDel ? 'Excluindo…' : 'Excluir tudo'}</Button>
-        <Button variant="outline" onClick={() => setDel(false)}>Cancelar</Button>
+        <div className="tile lg danger icon-top"><Icon name="alert" size={26} /></div>
+        <h2 className="t-m" style={{ textAlign: 'center' }}>Excluir tudo?</h2>
+        <p className="muted t-cap" style={{ textAlign: 'center' }}>Sua conta e os perfis de todos os filhos serão apagados para sempre. Digite EXCLUIR para confirmar.</p>
+        <Field label="Confirmação"><TextInput placeholder="EXCLUIR" autoCapitalize="characters" value={conf} onChange={(e) => setConf(e.target.value)} /></Field>
+        <Button variant="danger" disabled={busyDel || conf.trim().toUpperCase() !== 'EXCLUIR'} onClick={async () => { setBusyDel(true); const ok = await run(() => api.deleteAccount()); setBusyDel(false); if (ok) navigate('/entrar', true); }}>{busyDel ? 'Excluindo…' : 'Excluir definitivamente'}</Button>
+        <Button variant="outline" onClick={() => { setDel(false); setConf(''); }}>Cancelar</Button>
       </Sheet>
     </div>
   );
@@ -671,7 +739,7 @@ export function Reports() {
             <div className="card stat"><b>{data.total.toLocaleString('pt-BR')}</b><span>XP da família</span></div>
             <div className="card stat"><b>{data.tasks}</b><span>Tarefas feitas</span></div>
           </div>
-          <h2 className="t-s">XP por membro</h2>
+          <h2 className="t-s">XP por filho</h2>
           {data.perChild.length === 0 ? <Empty icon="chart" title="Sem dados" text="Adicione membros para ver os relatórios." /> : data.perChild.map((c) => {
             const max = Math.max(1, ...data.perChild.map((x) => x.xp));
             return (

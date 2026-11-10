@@ -18,7 +18,7 @@ export function Learn() {
     <KidLayout active="aprender">
       <div className="col" style={{ gap: 2 }}>
         <h1 className="t-l">Aprender</h1>
-        <span className="muted t-body">Educação financeira para o dia a dia</span>
+        <span className="muted t-cap">Educação financeira para o dia a dia</span>
       </div>
       <div className="card col">
         <div className="row between">
@@ -30,7 +30,7 @@ export function Learn() {
       {mods.map((m) => {
         const isLocked = m.state === 'locked';
         return (
-          <div key={m.slug} className={`card tight col ${m.state === 'current' ? 'mint-border' : ''}`} style={{ gap: 10, opacity: isLocked ? 0.75 : 1 }}>
+          <div key={m.slug} className={`card tight col ${m.state === 'current' ? 'mint-border' : ''}`} style={{ gap: 10, opacity: isLocked ? 0.6 : 1 }}>
             <button className="row" style={{ textAlign: 'left', width: '100%' }} onClick={() => (isLocked ? setLocked(m.slug) : navigate(`/filho/aprender/${m.slug}/0`))}>
               <div className={`tile ${isLocked ? 'locked' : m.state === 'done' ? '' : ''}`}>
                 <Icon name={m.state === 'done' ? 'check' : isLocked ? 'lock' : 'book'} size={22} />
@@ -41,9 +41,8 @@ export function Learn() {
                   {m.state === 'done' ? `Concluído · ${m.bestScore}/5 na prova` : isLocked ? `Conclua o módulo ${m.order - 1}` : `${m.lessons} lições · prova de 5 questões`}
                 </span>
               </div>
-              <span className={`badge ${m.state === 'done' ? 'soft' : ''}`}>+{MODULE_XP} XP</span>
+              {m.state === 'current' ? <span className="btn btn-primary btn-sm">Continuar</span> : <span className={`badge ${m.state === 'done' ? 'soft' : ''}`}>+{MODULE_XP} XP</span>}
             </button>
-            {m.state === 'current' && <Button small onClick={() => navigate(`/filho/aprender/${m.slug}/0`)} style={{ alignSelf: 'flex-end' }}>Continuar</Button>}
           </div>
         );
       })}
@@ -56,12 +55,20 @@ export function Learn() {
       <Sheet open={!!locked} onClose={() => setLocked(null)}>
         {locked && (
           <>
-            <div className="tile lg locked icon-top"><Icon name="lock" size={28} /></div>
+            <div className="tile lg mint-on-dark icon-top"><Icon name="lock" size={28} /></div>
             <h2 className="t-m" style={{ textAlign: 'center' }}>Módulo bloqueado</h2>
-            <p className="muted" style={{ textAlign: 'center' }}>
-              Conclua o módulo “{prev(mods.find((m) => m.slug === locked)!.order)?.title}” para liberar este.
-            </p>
-            <Button onClick={() => setLocked(null)}>Entendi</Button>
+            {(() => {
+              const pm = prev(mods.find((m) => m.slug === locked)!.order);
+              return (
+                <>
+                  <p className="muted t-cap" style={{ textAlign: 'center' }}>
+                    Termine o módulo {pm?.order} ({pm?.title}) e passe na prova para liberar este.
+                  </p>
+                  {pm && <Button icon="book" onClick={() => { setLocked(null); navigate(`/filho/aprender/${pm.slug}/0`); }}>Ir para o módulo {pm.order}</Button>}
+                </>
+              );
+            })()}
+            <Button variant="outline" onClick={() => setLocked(null)}>Fechar</Button>
           </>
         )}
       </Sheet>
@@ -96,7 +103,8 @@ export function Lesson({ slug, idx }: { slug: string; idx: number }) {
           <span className="t-body">{l.example}</span>
         </div>
       )}
-      <div className="footer-actions">
+      <div className="footer-actions" style={{ flexDirection: 'row' }}>
+        {i > 0 && <Button variant="outline" onClick={() => navigate(`/filho/aprender/${slug}/${i - 1}`)}>Anterior</Button>}
         <Button onClick={() => (last ? navigate(`/filho/aprender/${slug}/prova`) : navigate(`/filho/aprender/${slug}/${i + 1}`))}>
           {last ? 'Fazer a prova' : 'Próxima'}
         </Button>
@@ -160,14 +168,14 @@ export function Quiz({ slug }: { slug: string }) {
           else if (chosen === k) cls = 'selected';
           return (
             <button key={k} className={`option ${cls}`} role="radio" aria-checked={chosen === k} disabled={checked} onClick={() => setChosen(k)}>
-              <span className="letter">{checked && k === q.answer ? <Icon name="check" size={13} /> : checked && k === chosen ? <Icon name="x" size={13} /> : LETTERS[k]}</span>
+              <span className={`letter ${checked && k === q.answer ? 'ok' : checked && k === chosen ? 'no' : ''}`}>{checked && k === q.answer ? <Icon name="check" size={16} /> : checked && k === chosen ? <Icon name="x" size={16} /> : LETTERS[k]}</span>
               {o}
             </button>
           );
         })}
       </div>
       {checked && (
-        <Alert variant={chosen === q.answer ? 'info' : 'destructive'} icon={chosen === q.answer ? 'check' : 'info'} title={chosen === q.answer ? 'Resposta certa!' : 'Não foi dessa vez'}>
+        <Alert variant={chosen === q.answer ? 'info' : 'destructive'} icon={null} title={chosen === q.answer ? 'Correto!' : `Quase! A resposta certa é a ${LETTERS[q.answer]}.`}>
           {q.explanation}
         </Alert>
       )}
@@ -175,15 +183,15 @@ export function Quiz({ slug }: { slug: string }) {
         {!checked ? (
           <Button disabled={chosen === null} onClick={() => setChecked(true)}>Responder</Button>
         ) : (
-          <Button disabled={busy} onClick={next}>{lastQ ? 'Ver resultado' : 'Próxima'}</Button>
+          <Button disabled={busy} onClick={next}>{lastQ ? 'Ver resultado' : 'Próxima questão'}</Button>
         )}
       </div>
       <Sheet open={exit} onClose={() => setExit(false)}>
-        <div className="tile lg danger icon-top"><Icon name="alert" size={26} /></div>
+        <div className="tile lg warn icon-top"><Icon name="alert" size={26} /></div>
         <h2 className="t-m" style={{ textAlign: 'center' }}>Sair da prova?</h2>
-        <p className="muted" style={{ textAlign: 'center' }}>Seu progresso nesta prova será perdido.</p>
-        <Button variant="outline" onClick={() => setExit(false)}>Continuar prova</Button>
-        <Button variant="danger" onClick={() => navigate('/filho/aprender', true)}>Sair</Button>
+        <p className="muted t-cap" style={{ textAlign: 'center' }}>Seu progresso nesta prova será perdido e você começa de novo na próxima vez.</p>
+        <Button onClick={() => setExit(false)}>Continuar prova</Button>
+        <Button variant="danger-outline" onClick={() => navigate('/filho/aprender', true)}>Sair mesmo assim</Button>
       </Sheet>
     </div>
   );
@@ -197,33 +205,37 @@ export function QuizResultScreen({ slug }: { slug: string }) {
   const { res } = JSON.parse(raw) as { res: QuizResult };
   const pct = Math.round((res.correct / res.total) * 100);
   const nextMod = mods?.find((m) => m.state === 'current');
+  const curMod = mods?.find((m) => m.slug === slug);
   return (
     <div className="screen pad-bottom-actions">
       <div className="hero" style={{ paddingTop: 40 }}>
-        <div className={`halo ${res.passed ? '' : 'bad'}`}>
+        <div className="halo">
           <div>
-            <Icon name={res.passed ? 'trophy' : 'refresh'} size={42} />
+            <Icon name={res.passed ? 'trophy' : 'book'} size={56} />
           </div>
         </div>
         <h1 className="t-l">{res.passed ? 'Você foi aprovado!' : 'Quase lá!'}</h1>
         <p className="muted">
-          {res.passed ? `Acertou ${res.correct} de ${res.total} questões (${pct}%).` : `Você acertou ${res.correct} de ${res.total} (${pct}%). Precisa de ${Math.round(PASS_RATIO * 100)}% para passar.`}
+          {res.passed ? `Acertou ${res.correct} de ${res.total} questões (${pct}%).` : `Você acertou ${res.correct} de ${res.total} questões (${pct}%). A nota mínima é ${Math.round(PASS_RATIO * 100)}%.`}
         </p>
       </div>
       <div className="card tight">
         <div className="row-kv"><span className="muted">XP ganho</span>{res.xp ? <span className="badge">+{res.xp} XP</span> : <b>{res.passed ? 'já recebido' : '—'}</b>}</div>
-        <div className="row-kv"><span className="muted">Módulo</span><b className={res.passed ? 'mint' : 'warn'}>{res.passed ? 'Concluído' : 'Em andamento'}</b></div>
+        <div className="row-kv"><span className="muted">Módulo{curMod ? ` ${curMod.order}` : ''}</span><b className={res.passed ? 'mint' : 'warn'}>{res.passed ? 'Concluído' : 'Em andamento'}</b></div>
         {res.passed && nextMod && <div className="row-kv"><span className="muted">Próximo</span><b>{nextMod.order}. {nextMod.title}</b></div>}
       </div>
-      {!res.passed && <Alert icon="bulb" title="Dica">Releia as lições e veja o que errou. Você pode tentar quantas vezes quiser.</Alert>}
+      {!res.passed && <div className="alert"><span className="alert-icon"><Icon name="info" size={20} /></span><span className="alert-desc" style={{ color: 'var(--foreground)' }}>Releia as lições e tente de novo. Você não perde XP.</span></div>}
       <div className="footer-actions">
         {res.passed ? (
           <Button onClick={() => navigate('/filho/aprender')}>Continuar trilha</Button>
         ) : (
           <Button onClick={() => { sessionStorage.removeItem('mt-quiz-' + slug); navigate(`/filho/aprender/${slug}/prova`, true); }}>Tentar de novo</Button>
         )}
-        <Button variant="outline" onClick={() => navigate(`/filho/aprender/${slug}/revisar`)}>Revisar respostas</Button>
-        {!res.passed && data && <Button variant="ghost" onClick={() => navigate(`/filho/aprender/${slug}/0`)}>Reler as lições</Button>}
+        {res.passed ? (
+          <Button variant="outline" onClick={() => navigate(`/filho/aprender/${slug}/revisar`)}>Revisar respostas</Button>
+        ) : (
+          data && <Button variant="outline" onClick={() => navigate(`/filho/aprender/${slug}/0`)}>Rever as lições</Button>
+        )}
       </div>
     </div>
   );
@@ -231,27 +243,37 @@ export function QuizResultScreen({ slug }: { slug: string }) {
 
 export function Review({ slug }: { slug: string }) {
   const { data } = useData(() => api.module(slug), [slug]);
+  const [open, setOpen] = useState<number | null>(null);
   const raw = sessionStorage.getItem('mt-quiz-' + slug);
   if (!data) return <div className="screen"><TopBar title="Revisar respostas" /><Loading /></div>;
   const answers: number[] = raw ? JSON.parse(raw).answers : [];
   return (
     <div className="screen">
       <TopBar title="Revisar respostas" onBack={() => navigate(`/filho/aprender/${slug}/resultado`)} />
-      {data.module.questions.map((q, i) => {
-        const right = answers[i] === q.answer;
-        return (
-          <div key={i} className="card col" style={{ gap: 10 }}>
-            <div className="row between">
-              <b className="t-label">Questão {i + 1}</b>
-              <span className={`badge ${right ? 'soft' : 'bad'}`}>{right ? 'Certa' : 'Errada'}</span>
+      <div className="card menu">
+        {data.module.questions.map((q, i) => {
+          const right = answers[i] === q.answer;
+          return (
+            <div key={i}>
+              <button className="list-item" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>
+                <div className={`tile sm ${right ? '' : 'danger'}`} style={{ width: 32, height: 32 }}>
+                  <Icon name={right ? 'check' : 'x'} size={16} />
+                </div>
+                <span className="label" style={{ fontSize: 14 }}>Q{i + 1} · {q.prompt}</span>
+                <Icon name="chevron" size={20} className="dim" />
+              </button>
+              {open === i && (
+                <div className="col" style={{ gap: 6, padding: '0 14px 14px' }}>
+                  {!right && answers[i] !== undefined && <span className="danger t-cap">Sua resposta: {q.options[answers[i]]}</span>}
+                  <span className="mint t-cap semi">Resposta certa: {q.options[q.answer]}</span>
+                  <span className="muted t-cap">{q.explanation}</span>
+                </div>
+              )}
             </div>
-            <b className="t-body">{q.prompt}</b>
-            {!right && answers[i] !== undefined && <span className="danger t-cap">Sua resposta: {q.options[answers[i]]}</span>}
-            <span className="mint t-cap semi">Resposta certa: {q.options[q.answer]}</span>
-            <span className="muted t-cap">{q.explanation}</span>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
+      <p className="muted t-cap">Toque em uma questão para ver a explicação.</p>
     </div>
   );
 }

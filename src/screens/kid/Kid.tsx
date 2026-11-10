@@ -3,7 +3,7 @@ import { api, type KidTask } from '../../lib/api';
 import { currentQuery, navigate } from '../../lib/router';
 import { levelProgress } from '../../lib/xp';
 import { installApp, isIOS, isStandalone, shrinkImage } from '../../lib/pwa';
-import { Alert, BottomNav, Button, Chip, Empty, Loading, Progress, Sheet, TopBar, run, toast, useData, deadlineText, when, xpText, type NavItem } from '../../ui/kit';
+import { Alert, BottomNav, Button, Chip, Empty, Loading, Progress, Sheet, TopBar, run, toast, useData, deadlineText, deadlineLabel, when, xpText, type NavItem } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 import type { Child, Reward } from '../../lib/types';
 
@@ -50,7 +50,7 @@ export function KidHome() {
           <Initial c={me} />
           <div className="col" style={{ gap: 0 }}>
             <h1 className="t-m">Olá, {me.name}!</h1>
-            <span className="muted t-body">Vamos ganhar XP hoje?</span>
+            <span className="muted t-cap">Vamos ganhar XP hoje?</span>
           </div>
         </div>
       </div>
@@ -89,7 +89,7 @@ export function KidHome() {
 
       <div className="card col" style={{ gap: 10 }}>
         <div className="row between">
-          <b className="t-h">Nível {lp.level}</b>
+          <b style={{ fontSize: 15 }}>Nível {lp.level}</b>
           <span className="muted t-cap">Total ganho: {me.lifetime.toLocaleString('pt-BR')} XP</span>
         </div>
         <Progress pct={lp.pct} />
@@ -99,7 +99,7 @@ export function KidHome() {
       <WeekStreak streak={me.streak} lastActive={me.lastActive} />
 
       <div className="row between">
-        <h2 className="t-s">Tarefas de hoje</h2>
+        <h2 className="t-h">Tarefas de hoje</h2>
         <a className="link" href="#/filho/tarefas">
           Ver todas
         </a>
@@ -111,14 +111,14 @@ export function KidHome() {
       )}
 
       {next && (
-        <button className="card clickable col" style={{ textAlign: 'left', gap: 8 }} onClick={() => navigate('/filho/loja')}>
-          <span className="muted t-cap">Próxima recompensa</span>
+        <button className="card clickable col" style={{ textAlign: 'left', gap: 8, padding: 12, borderRadius: 12 }} onClick={() => navigate('/filho/loja')}>
+          <span className="muted t-cap-s">Próxima recompensa</span>
           <div className="row">
             <div className="tile">
               <Icon name={next.icon} size={22} />
             </div>
             <div className="col grow" style={{ gap: 2 }}>
-              <b className="t-h">{next.title}</b>
+              <b className="semi" style={{ fontSize: 15 }}>{next.title}</b>
               <Progress small pct={(me.balance / next.cost) * 100} />
               <span className="muted t-cap">
                 {me.balance.toLocaleString('pt-BR')} / {next.cost.toLocaleString('pt-BR')} XP
@@ -209,7 +209,7 @@ function NoticeSheet({ notice }: { notice: { id: string; kind: string; title: st
           <p className="muted" style={{ textAlign: 'center' }}>
             {approved ? 'Seu responsável aprovou a tarefa. Continue assim!' : notice.text}
           </p>
-          <Button onClick={() => api.dismissNotice(notice.id)}>{approved ? 'Continuar' : 'Legal!'}</Button>
+          <Button onClick={() => api.dismissNotice(notice.id)}>{approved || notice.kind === 'levelup' ? 'Continuar' : 'Legal!'}</Button>
         </>
       )}
     </Sheet>
@@ -223,16 +223,16 @@ function TaskRow({ t, compact }: { t: KidTask; compact?: boolean }) {
   const open = state === 'todo' || state === 'rejected';
   const late = open && !!task.dueAt && task.dueAt < Date.now();
   return (
-    <div className="card tight col" style={{ gap: 10 }}>
+    <div className={`card tight col ${compact ? '' : 'bordered'}`} style={{ gap: 10, borderRadius: compact ? 12 : 14, padding: compact ? 12 : 14 }}>
       <div className="row">
-        <div className={`tile ${done ? 'dark' : ''}`}>
+        <div className={`tile ${compact ? '' : 'md'} ${done ? 'dark' : ''}`}>
           <Icon name={done ? 'check' : task.icon} size={22} />
         </div>
         <div className="col grow" style={{ gap: 0, minWidth: 0 }}>
-          <b className="t-h" style={{ textDecoration: done ? 'line-through' : 'none', opacity: done ? 0.7 : 1 }}>
+          <b className={compact ? 'semi' : 'bold'} style={{ fontSize: 15, textDecoration: done ? 'line-through' : 'none', opacity: done ? 0.7 : 1 }}>
             {task.title}
           </b>
-          {compact ? <span className="mint t-cap semi">+{task.xp} XP{open && task.dueAt && !late ? ` · até ${deadlineText(task.dueAt)}` : ''}</span> : <span className="muted t-cap">{task.description}</span>}
+          {compact ? <span className="mint t-cap bold">{task.xp} XP</span> : <span className="muted t-cap">{task.description}</span>}
         </div>
         {compact && late && <span className="badge late">Prazo vencido</span>}
         {compact && open && !late && (
@@ -244,9 +244,8 @@ function TaskRow({ t, compact }: { t: KidTask; compact?: boolean }) {
       {!compact && (
         <div className="row between" style={{ flexWrap: 'wrap' }}>
           <div className="chips">
-            <Chip icon="clock">{task.repeat === 'daily' ? 'Diária' : task.repeat === 'weekly' ? 'Semanal' : 'Uma vez'}</Chip>
-            <span className="badge">+{task.xp} XP</span>
-            {open && task.dueAt && <Chip icon="clock" tone={late ? 'late' : undefined}>{late ? 'Prazo vencido' : `Até ${deadlineText(task.dueAt)}`}</Chip>}
+            {open && task.dueAt && <Chip icon="clock" tone={late ? 'late' : undefined}>{late ? 'Prazo vencido' : deadlineLabel(task.dueAt)}</Chip>}
+            <span className="badge">{task.xp} XP</span>
             {open && !!task.penalty && !late && <Chip tone="warn">−{task.penalty} XP se atrasar</Chip>}
           </div>
           {late && <span className="badge late">Sem tempo</span>}
@@ -289,15 +288,10 @@ export function KidTasks() {
     <KidLayout active="tarefas">
       <div className="col" style={{ gap: 2 }}>
         <h1 className="t-l">Minhas tarefas</h1>
-        <span className="muted t-body">Conclua e ganhe XP</span>
+        <span className="muted t-cap">Conclua e ganhe XP</span>
       </div>
-      <Alert variant="promo" icon="trophy" title="Meta da semana" action={undefined}>
-        <span>
-          {week.done >= week.goal ? 'Meta cumprida! Continue assim.' : `${week.done} de ${week.goal} tarefas feitas. Conclua ${week.goal} e ganhe um bônus de reconhecimento.`}
-        </span>
-        <span style={{ display: 'block', marginTop: 8 }}>
-          <Progress small pct={(week.done / week.goal) * 100} />
-        </span>
+      <Alert variant="promo" icon="trophy" title="Meta da semana" action={week.done < week.goal ? <Button small onClick={() => setTab('todo')}>Continuar</Button> : undefined}>
+        {week.done >= week.goal ? 'Meta cumprida! Continue assim.' : `Conclua ${week.goal} tarefas e ganhe um bônus de reconhecimento. Feitas: ${week.done}.`}
       </Alert>
       <div className="chips">
         <Chip active={tab === 'todo'} onClick={() => setTab('todo')}>A fazer · {groups.todo.length}</Chip>
@@ -305,7 +299,7 @@ export function KidTasks() {
         <Chip active={tab === 'done'} onClick={() => setTab('done')}>Feitas · {groups.done.length}</Chip>
       </div>
       {list.length === 0 ? (
-        <Empty icon={tab === 'done' ? 'trophy' : 'check'} title={tab === 'todo' ? 'Nenhuma tarefa por enquanto' : tab === 'pending' ? 'Nada aguardando' : 'Nenhuma tarefa feita ainda'} text={tab === 'todo' ? 'Peça ao seu responsável para criar tarefas.' : 'Quando houver, elas aparecem aqui.'} />
+        <Empty icon={tab === 'done' ? 'trophy' : 'list'} title={tab === 'todo' ? 'Nada para fazer agora' : tab === 'pending' ? 'Nada aguardando' : 'Nenhuma tarefa feita ainda'} text={tab === 'todo' ? 'Quando seu responsável criar tarefas, elas aparecem aqui.' : 'Quando houver, elas aparecem aqui.'} />
       ) : (
         list.map((t) => <TaskRow key={t.task.id} t={t} />)
       )}
@@ -340,19 +334,31 @@ export function KidDoTask({ id }: { id: string }) {
 
   return (
     <div className="screen pad-bottom-actions">
-      <TopBar title={task.title} onBack={() => navigate('/filho/tarefas')} />
-      <div className="card row">
-        <div className="tile">
-          <Icon name={task.icon} size={22} />
+      <TopBar title="Concluir tarefa" onBack={() => navigate('/filho/tarefas')} />
+      <div className="card col" style={{ gap: 12 }}>
+        <div className="row">
+          <div className="tile xl">
+            <Icon name={task.icon} size={24} />
+          </div>
+          <div className="col grow" style={{ gap: 6 }}>
+            <b className="t-s">{task.title}</b>
+            <div className="chips">
+              <span className="badge">{task.xp} XP</span>
+              {state === 'rejected' && <span className="badge bad"><Icon name="x" size={14} /> Recusada</span>}
+              {task.dueAt && (state === 'todo' || state === 'rejected') && !late && <Chip icon="clock">{deadlineLabel(task.dueAt)}</Chip>}
+              {!!task.penalty && !late && (state === 'todo' || state === 'rejected') && <Chip tone="warn">−{task.penalty} XP se atrasar</Chip>}
+            </div>
+          </div>
         </div>
-        <b className="t-h grow">{task.title}</b>
-        <span className="badge">+{task.xp} XP</span>
+        {task.description && (
+          <div className="col" style={{ gap: 4 }}>
+            <span className="t-cap-s semi muted" style={{ textTransform: 'uppercase', letterSpacing: 0.4 }}>Descrição</span>
+            <span className="t-body">{task.description}</span>
+          </div>
+        )}
       </div>
-      {task.description && <p className="muted">{task.description}</p>}
-      {task.dueAt && (state === 'todo' || state === 'rejected') && (
-        late
-          ? <Alert variant="destructive" icon="clock" title="Prazo vencido">O prazo desta tarefa acabou em {deadlineText(task.dueAt)}.{task.penalty ? ` Foram descontados até ${task.penalty} XP.` : ''}</Alert>
-          : <Alert variant="warning" icon="clock" title={`Faça até ${deadlineText(task.dueAt)}`}>{task.penalty ? `Se passar do prazo, você perde ${task.penalty} XP.` : 'Depois disso não dá mais para enviar.'}</Alert>
+      {task.dueAt && (state === 'todo' || state === 'rejected') && late && (
+        <Alert variant="destructive" icon="clock" title="Prazo vencido">O prazo desta tarefa acabou em {deadlineText(task.dueAt)}.{task.penalty ? ` Foram descontados até ${task.penalty} XP.` : ''}</Alert>
       )}
       {t.partners && (
         <div className="col" style={{ gap: 8 }}>
@@ -362,15 +368,18 @@ export function KidDoTask({ id }: { id: string }) {
         </div>
       )}
       {state === 'rejected' && (
-        <Alert variant="destructive" icon="alert" title="Recado do seu responsável">
+        <Alert variant="destructive" icon={null} title="Recado do seu responsável">
           {submission?.reason || 'Seu responsável pediu para refazer. Pode enviar de novo!'}
         </Alert>
       )}
       {state === 'pending' && <Alert variant="warning" icon="clock" title="Aguardando aprovação">Seu responsável vai conferir em breve.</Alert>}
       {state === 'done' && <Alert variant="success" icon="check" title="Tarefa concluída">Você já ganhou o XP desta tarefa.</Alert>}
-      {!locked && task.needsPhoto && (
+      {!locked && (
         <div className="col">
-          <b className="t-label">Foto como prova</b>
+          <div className="row" style={{ gap: 6 }}>
+            <b className="semi" style={{ fontSize: 15 }}>Prova da tarefa</b>
+            {!task.needsPhoto && <span className="muted t-cap">(opcional)</span>}
+          </div>
           {photo ? (
             <>
               <img className="photo" src={photo} alt="Prova da tarefa" />
@@ -381,18 +390,22 @@ export function KidDoTask({ id }: { id: string }) {
             </>
           ) : (
             <label className="dropzone" style={{ cursor: 'pointer' }}>
-              <Icon name="camera" size={30} />
-              <b className="t-label">Tirar ou escolher foto</b>
-              <span className="t-cap">Mostre que você fez a tarefa</span>
+              <Icon name="camera" size={32} />
+              <b className="semi" style={{ fontSize: 14, color: 'var(--foreground)' }}>Toque para tirar uma foto</b>
+              <span className="t-cap">ou escolher da galeria</span>
               <input className="sr" type="file" accept="image/*" capture="environment" onChange={(e) => pick(e.target.files?.[0])} />
             </label>
           )}
         </div>
       )}
-      {!locked && !task.needsPhoto && <Alert icon="info" title="Sem foto">Esta tarefa não pede foto. É só enviar quando terminar.</Alert>}
+      {!locked && (
+        <p className="muted t-cap row" style={{ gap: 8 }}>
+          <Icon name="info" size={18} /> Seu responsável vai conferir antes de liberar o XP.
+        </p>
+      )}
       <div className="footer-actions">
         <Button disabled={locked || busy || (task.needsPhoto && !photo)} onClick={send}>
-          {state === 'rejected' ? 'Enviar de novo' : 'Enviar para aprovação'}
+          {state === 'rejected' ? 'Tentar de novo' : 'Enviar para aprovação'}
         </Button>
       </div>
     </div>
@@ -406,7 +419,7 @@ export function KidSent({ id }: { id: string }) {
       <div className="hero" style={{ paddingTop: 40 }}>
         <div className="halo">
           <div>
-            <Icon name="check" size={44} />
+            <Icon name="check" size={56} />
           </div>
         </div>
         <h1 className="t-l">Tarefa enviada!</h1>
@@ -415,11 +428,11 @@ export function KidSent({ id }: { id: string }) {
       {t && (
         <div className="card col">
           <div className="row">
-            <div className="tile">
+            <div className="tile md">
               <Icon name={t.task.icon} size={22} />
             </div>
             <div className="col grow" style={{ gap: 0 }}>
-              <b className="t-h">{t.task.title}</b>
+              <b className="bold" style={{ fontSize: 15 }}>{t.task.title}</b>
               <span className="muted t-cap">Enviada agora</span>
             </div>
             <span className="badge">+{t.task.xp} XP</span>
@@ -458,7 +471,7 @@ export function KidShop() {
     const ok = await run(() => api.redeem(r.id));
     setBusy(false);
     if (ok) {
-      sessionStorage.setItem('mt-redeemed', JSON.stringify({ title: r.title, cost: r.cost }));
+      sessionStorage.setItem('mt-redeemed', JSON.stringify({ title: r.title, cost: r.cost, icon: r.icon }));
       setSel(null);
       navigate('/filho/resgatado');
     }
@@ -469,9 +482,9 @@ export function KidShop() {
       <div className="row between">
         <div className="col" style={{ gap: 2 }}>
           <h1 className="t-l">Loja</h1>
-          <span className="muted t-body">Troque seu XP por prêmios</span>
+          <span className="muted t-cap">Troque seu XP por prêmios</span>
         </div>
-        <span className="badge" style={{ height: 32, padding: '0 14px', fontSize: 14 }}>
+        <span className="badge" style={{ height: 36, padding: '6px 12px', fontSize: 16 }}>
           {me.balance.toLocaleString('pt-BR')} XP
         </span>
       </div>
@@ -482,41 +495,41 @@ export function KidShop() {
 
       {tab === 'loja' ? (
         rewards.length === 0 ? (
-          <Empty icon="gift" title="A loja está vazia" text="Peça ao seu responsável para criar recompensas." />
+          <Empty icon="gift" title="A loja ainda está vazia" text="Seu responsável ainda não criou recompensas." />
         ) : (
           <>
             {(() => {
               const nxt = rewards.find((r) => r.cost > me.balance);
               return nxt ? (
                 <Alert variant="promo" icon="gift" title="Falta pouco!" action={<Button small onClick={() => navigate('/filho/tarefas')}>Ganhar XP</Button>}>
-                  Ganhe mais {(nxt.cost - me.balance).toLocaleString('pt-BR')} XP para trocar por “{nxt.title}”.
+                  Ganhe mais {(nxt.cost - me.balance).toLocaleString('pt-BR')} XP e troque pela próxima recompensa.
                 </Alert>
               ) : null;
             })()}
             {rewards.map((r) => {
               const ok = me.balance >= r.cost;
               return (
-                <div key={r.id} className="card col" style={{ gap: 12 }}>
+                <div key={r.id} className="card bordered col" style={{ gap: 12, padding: 14, borderRadius: 14 }}>
                   <div className="row">
-                    <div className="tile">
+                    <div className="tile md">
                       <Icon name={r.icon} size={22} />
                     </div>
                     <div className="col grow" style={{ gap: 0 }}>
-                      <b className="t-h">{r.title}</b>
+                      <b className="bold" style={{ fontSize: 15 }}>{r.title}</b>
                       <span className="muted t-cap">{r.description}</span>
                       {r.expiresAt && <span style={{ marginTop: 6 }}><Chip icon="clock" tone="warn">Até {deadlineText(r.expiresAt)}</Chip></span>}
                     </div>
                     <span className="badge">{r.cost.toLocaleString('pt-BR')} XP</span>
                   </div>
                   {ok ? (
-                    <Button icon="gift" onClick={() => setSel(r)}>
+                    <Button icon="gift" className="btn-block-sm" onClick={() => setSel(r)}>
                       Resgatar
                     </Button>
                   ) : (
                     <button className="col" style={{ gap: 6, textAlign: 'left' }} onClick={() => setSel(r)}>
                       <Progress small pct={(me.balance / r.cost) * 100} />
-                      <span className="muted t-cap">
-                        <Icon name="lock" size={12} /> Faltam {(r.cost - me.balance).toLocaleString('pt-BR')} XP
+                      <span className="dim t-cap">
+                        <Icon name="lock" size={14} /> Faltam {(r.cost - me.balance).toLocaleString('pt-BR')} XP
                       </span>
                     </button>
                   )}
@@ -530,7 +543,7 @@ export function KidShop() {
       ) : (
         reds.map((x) => (
           <div key={x.id} className="card row">
-            <div className="tile">
+            <div className="tile md">
               <Icon name={x.reward?.icon || 'gift'} size={22} />
             </div>
             <div className="col grow" style={{ gap: 0 }}>
@@ -539,7 +552,7 @@ export function KidShop() {
                 {when(x.createdAt)} · −{x.cost} XP
               </span>
             </div>
-            {x.status === 'pending' ? <span className="badge warn">Aguardando</span> : <span className="badge soft">Entregue</span>}
+            {x.status === 'pending' ? <span className="badge warn"><Icon name="clock" size={14} /> Aguardando</span> : <span className="badge soft"><Icon name="check" size={14} /> Entregue</span>}
           </div>
         ))
       )}
@@ -547,15 +560,16 @@ export function KidShop() {
       <Sheet open={!!sel} onClose={() => setSel(null)}>
         {sel && enough && (
           <>
-            <div className="tile lg icon-top">
+            <div className="tile lg icon-top" style={{ borderRadius: 12 }}>
               <Icon name={sel.icon} size={28} />
             </div>
             <h2 className="t-m" style={{ textAlign: 'center' }}>Resgatar recompensa?</h2>
-            <b className="mint" style={{ textAlign: 'center' }}>{sel.title}</b>
-            <div className="card tight">
-              <div className="row-kv"><span className="muted">Custo</span><b>{sel.cost.toLocaleString('pt-BR')} XP</b></div>
-              <div className="row-kv"><span className="muted">Saldo atual</span><b>{me.balance.toLocaleString('pt-BR')} XP</b></div>
-              <div className="row-kv"><span className="muted">Saldo depois</span><b className="mint">{(me.balance - sel.cost).toLocaleString('pt-BR')} XP</b></div>
+            <b className="mint semi" style={{ textAlign: 'center', fontSize: 15 }}>{sel.title}</b>
+            <div className="col" style={{ background: 'var(--background)', borderRadius: 14, padding: '12px 14px', gap: 10 }}>
+              <div className="row between"><span className="muted t-body">Custo</span><b className="semi" style={{ fontSize: 15 }}>{sel.cost.toLocaleString('pt-BR')} XP</b></div>
+              <div className="row between"><span className="muted t-body">Saldo atual</span><b className="semi" style={{ fontSize: 15 }}>{me.balance.toLocaleString('pt-BR')} XP</b></div>
+              <hr className="divider" />
+              <div className="row between"><span className="muted t-body">Saldo depois</span><b className="mint t-h">{(me.balance - sel.cost).toLocaleString('pt-BR')} XP</b></div>
             </div>
             <Button icon="check" disabled={busy} onClick={redeem}>Confirmar resgate</Button>
             <Button variant="outline" onClick={() => setSel(null)}>Cancelar</Button>
@@ -563,7 +577,7 @@ export function KidShop() {
         )}
         {sel && !enough && (
           <>
-            <div className="tile lg icon-top locked">
+            <div className="tile lg icon-top mint-on-dark">
               <Icon name="lock" size={28} />
             </div>
             <h2 className="t-m" style={{ textAlign: 'center' }}>Ainda faltam {(sel.cost - me.balance).toLocaleString('pt-BR')} XP</h2>
@@ -580,7 +594,7 @@ export function KidShop() {
 }
 
 export function KidRedeemed() {
-  const r = JSON.parse(sessionStorage.getItem('mt-redeemed') || '{"title":"Recompensa","cost":0}');
+  const r = JSON.parse(sessionStorage.getItem('mt-redeemed') || '{"title":"Recompensa","cost":0,"icon":"gift"}');
   const { data: me } = useData(() => api.me());
   return (
     <div className="screen pad-bottom-actions">
@@ -595,24 +609,24 @@ export function KidRedeemed() {
       </div>
       <div className="card col">
         <div className="row">
-          <div className="tile">
-            <Icon name="gift" size={22} />
+          <div className="tile md">
+            <Icon name={r.icon || 'gift'} size={22} />
           </div>
           <div className="col grow" style={{ gap: 0 }}>
-            <b className="t-h">{r.title}</b>
+            <b className="bold" style={{ fontSize: 15 }}>{r.title}</b>
             <span className="muted t-cap">−{r.cost} XP</span>
           </div>
         </div>
         <hr className="divider" />
         <div className="row between">
           <span className="muted">Saldo agora</span>
-          <b className="mint t-s">{me ? me.balance.toLocaleString('pt-BR') : '…'} XP</b>
+          <b className="mint t-m">{me ? me.balance.toLocaleString('pt-BR') : '…'} XP</b>
         </div>
       </div>
       <div className="footer-actions">
-        <Button onClick={() => navigate('/filho/loja')}>Ver meus resgates</Button>
-        <Button variant="outline" onClick={() => navigate('/filho')}>
-          Voltar ao início
+        <Button onClick={() => navigate('/filho/loja?tab=resgates')}>Ver meus resgates</Button>
+        <Button variant="outline" onClick={() => navigate('/filho/loja')}>
+          Voltar à loja
         </Button>
       </div>
     </div>
@@ -620,6 +634,7 @@ export function KidRedeemed() {
 }
 
 // ---------- conquistas ----------
+const ACH_SUB: Record<string, string> = { first_task: 'Concluída', streak_3: 'Sequência', streak_7: 'Sequência', first_redeem: 'Recompensa', xp_500: 'Meta', study_master: 'Estudos' };
 export function KidAchievements() {
   const { data: ach } = useData(() => api.myAchievements());
   const { data: me } = useData(() => api.me());
@@ -630,7 +645,7 @@ export function KidAchievements() {
     <KidLayout active="conquistas">
       <div className="col" style={{ gap: 2 }}>
         <h1 className="t-l">Conquistas</h1>
-        <span className="muted t-body">{n} de {ach.length} desbloqueadas</span>
+        <span className="muted t-cap">{n} de {ach.length} desbloqueadas</span>
       </div>
       <div className="card col">
         <div className="row between">
@@ -645,8 +660,8 @@ export function KidAchievements() {
             <div className="circle">
               <Icon name={a.unlocked ? a.icon : 'lock'} size={26} />
             </div>
-            <b className="t-label">{a.title}</b>
-            <span className="muted t-cap-s">{a.unlocked ? 'Desbloqueada' : a.hint}</span>
+            <b className="t-label" style={a.unlocked ? undefined : { color: 'var(--dim)' }}>{a.title}</b>
+            <span className={`${a.unlocked ? 'muted' : 'dim'} t-cap-s`}>{a.unlocked ? ACH_SUB[a.code] || 'Desbloqueada' : a.hint}</span>
           </div>
         ))}
       </div>
@@ -662,11 +677,11 @@ export function KidProfile() {
   const edu = me.age >= 16;
   const MenuItem = ({ icon, label, path }: { icon: string; label: string; path: string }) => (
     <button className="list-item" onClick={() => navigate(path)}>
-      <div className="tile dark sm">
-        <Icon name={icon} size={18} />
+      <div className="tile dark" style={{ width: 36, height: 36, borderRadius: 12 }}>
+        <Icon name={icon} size={20} />
       </div>
-      <span className="label">{label}</span>
-      <Icon name="chevron" size={16} className="dim" />
+      <span className="label" style={{ fontSize: 15 }}>{label}</span>
+      <Icon name="chevron" size={20} className="dim" />
     </button>
   );
   return (
@@ -674,8 +689,8 @@ export function KidProfile() {
       <div className="hero" style={{ paddingTop: 8 }}>
         <Initial c={me} size="xl" />
         <h1 className="t-l">{me.name}</h1>
-        <span className="muted">@{me.username} · {me.age} anos</span>
-        <span className="badge soft"><Icon name="trophy" size={14} /> Nível {me.level}</span>
+        <span className="muted t-cap">@{me.username} · {me.age} anos</span>
+        <span className="badge"><Icon name="trophy" size={14} /> Nível {me.level}</span>
       </div>
       <div className="card menu">
         <MenuItem icon="list" label="Meu extrato de XP" path="/filho/extrato" />
@@ -683,12 +698,12 @@ export function KidProfile() {
         {edu ? <MenuItem icon="trophy" label="Minhas conquistas" path="/filho/conquistas" /> : <MenuItem icon="trophy" label="Minhas conquistas" path="/filho/conquistas" />}
       </div>
       <p className="muted t-cap"><Icon name="info" size={13} /> Para trocar sua senha, peça ao seu responsável.</p>
-      <InstallBanner />
       <Button variant="danger-outline" icon="logout" onClick={() => setOut(true)}>Sair</Button>
+      <InstallBanner />
       <Sheet open={out} onClose={() => setOut(false)}>
-        <div className="tile lg danger icon-top"><Icon name="logout" size={26} /></div>
+        <div className="tile lg icon-top"><Icon name="logout" size={26} /></div>
         <h2 className="t-m" style={{ textAlign: 'center' }}>Sair da conta?</h2>
-        <p className="muted" style={{ textAlign: 'center' }}>Para entrar de novo, você vai precisar do usuário e da senha.</p>
+        <p className="muted t-cap" style={{ textAlign: 'center' }}>Para entrar de novo, use seu usuário e senha.</p>
         <Button variant="danger" onClick={async () => { await api.logout(); navigate('/filho/entrar', true); }}>Sair</Button>
         <Button variant="outline" onClick={() => setOut(false)}>Cancelar</Button>
       </Sheet>
@@ -727,23 +742,30 @@ export function KidStatement() {
     <div className="screen">
       <TopBar title="Extrato de XP" onBack={() => navigate('/filho/perfil')} />
       {me && (
-        <div className="card row between">
-          <span className="muted">Saldo atual</span>
-          <b className="t-m mint">{me.balance.toLocaleString('pt-BR')} XP</b>
+        <div className="row" style={{ gap: 12, alignItems: 'stretch' }}>
+          <div className="card col grow" style={{ padding: 14, borderRadius: 14, gap: 4 }}>
+            <span className="muted t-cap">Saldo atual</span>
+            <b className="num-m mint">{me.balance.toLocaleString('pt-BR')} XP</b>
+          </div>
+          <div className="card col grow" style={{ padding: 14, borderRadius: 14, gap: 4 }}>
+            <span className="muted t-cap">Ganhos totais</span>
+            <b className="num-m mint">{me.lifetime.toLocaleString('pt-BR')} XP</b>
+          </div>
         </div>
       )}
+      <h2 className="t-h">Movimentações</h2>
       {!led ? <Loading /> : led.length === 0 ? <Empty icon="list" title="Sem movimentações" text="Seu XP ganho e gasto aparece aqui." /> : (
-        <div className="card menu">
+        <div className="card menu" style={{ padding: '4px 14px' }}>
           {led.map((e) => (
-            <div key={e.id} className="list-item">
-              <div className={`tile dark sm`}>
-                <Icon name={e.delta > 0 ? 'check' : 'gift'} size={16} />
+            <div key={e.id} className="list-item" style={{ padding: '12px 0' }}>
+              <div className={`tile ${e.delta > 0 ? '' : 'dark'}`} style={{ width: 36, height: 36, borderRadius: 12 }}>
+                <Icon name={e.delta > 0 ? 'check' : 'gift'} size={18} />
               </div>
               <div className="col grow" style={{ gap: 0 }}>
-                <b className="t-label">{e.reason}</b>
+                <b className="semi" style={{ fontSize: 15 }}>{e.reason}</b>
                 <span className="muted t-cap">{when(e.createdAt)}</span>
               </div>
-              <b className={e.delta > 0 ? 'mint' : 'danger'}>{xpText(e.delta)}</b>
+              <b className={e.delta > 0 ? 'mint' : 'danger'} style={{ fontSize: 16 }}>{e.delta > 0 ? '+' : '−'}{Math.abs(e.delta).toLocaleString('pt-BR')}</b>
             </div>
           ))}
         </div>

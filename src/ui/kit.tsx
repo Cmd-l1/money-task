@@ -95,11 +95,11 @@ export function Field({ label, hint, error, children }: { label: string; hint?: 
 export function TextInput({ invalid, ...p }: React.InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
   return <input {...p} className={`input ${invalid ? 'invalid' : ''} ${p.className || ''}`} />;
 }
-export function PasswordInput(p: React.InputHTMLAttributes<HTMLInputElement>) {
+export function PasswordInput({ invalid, ...p }: React.InputHTMLAttributes<HTMLInputElement> & { invalid?: boolean }) {
   const [show, setShow] = useState(false);
   return (
     <div className="input-wrap">
-      <input {...p} type={show ? 'text' : 'password'} className="input" />
+      <input {...p} type={show ? 'text' : 'password'} className={`input ${invalid ? 'invalid' : ''}`} />
       <button type="button" className="toggle" onClick={() => setShow(!show)} aria-label={show ? 'Ocultar senha' : 'Mostrar senha'}>
         <Icon name={show ? 'eyeoff' : 'eye'} size={20} />
       </button>
@@ -107,12 +107,14 @@ export function PasswordInput(p: React.InputHTMLAttributes<HTMLInputElement>) {
   );
 }
 
-export function Alert({ variant = 'info', icon = 'info', title, children, action }: { variant?: 'info' | 'warning' | 'promo' | 'destructive' | 'success'; icon?: string; title: string; children?: ReactNode; action?: ReactNode }) {
+export function Alert({ variant = 'info', icon = 'info', title, children, action }: { variant?: 'info' | 'warning' | 'promo' | 'destructive' | 'success'; icon?: string | null; title: string; children?: ReactNode; action?: ReactNode }) {
   return (
     <div className={`alert ${variant === 'info' ? '' : variant}`} role={variant === 'destructive' ? 'alert' : undefined}>
-      <span className="alert-icon">
-        <Icon name={icon} size={22} />
-      </span>
+      {icon && (
+        <span className="alert-icon">
+          <Icon name={icon} size={22} />
+        </span>
+      )}
       <div className="alert-body">
         <span className="alert-title">{title}</span>
         {children && <span className="alert-desc">{children}</span>}
@@ -187,12 +189,12 @@ export function Loading() {
 
 export function Empty({ icon, title, text, action }: { icon: string; title: string; text: string; action?: ReactNode }) {
   return (
-    <div className="card col center" style={{ padding: 24, gap: 12 }}>
-      <div className="tile lg">
+    <div className="card col center" style={{ padding: '28px 20px', gap: 12 }}>
+      <div className="tile lg" style={{ borderRadius: 12 }}>
         <Icon name={icon} size={28} />
       </div>
       <h3 className="t-h">{title}</h3>
-      <p className="muted t-body">{text}</p>
+      <p className="muted t-cap">{text}</p>
       {action}
     </div>
   );
@@ -253,6 +255,11 @@ export function DateTimeInput({ value, onChange, invalid, label }: { value: numb
     />
   );
 }
+/** "Hoje, 20:00", "Amanhã, 08:30" ou "12/10, 18:00" (como no Figma). */
+export const deadlineLabel = (t: number) => {
+  const x = deadlineText(t).replace(' ', ', ');
+  return x.charAt(0).toUpperCase() + x.slice(1);
+};
 /** "hoje 18:00", "amanhã 08:30" ou "12/10 18:00". */
 export const deadlineText = (t: number) => {
   const d = new Date(t);
@@ -262,3 +269,14 @@ export const deadlineText = (t: number) => {
   if (d.toDateString() === new Date(now.getTime() + 86400000).toDateString()) return `amanhã ${hm}`;
   return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)} ${hm}`;
 };
+
+/** Indicador de passos (pílula ativa mais larga), como no Figma. */
+export function Steps({ step, total }: { step: number; total: number }) {
+  return (
+    <div className="steps" role="img" aria-label={`Passo ${step + 1} de ${total}`}>
+      {Array.from({ length: total }, (_, i) => (
+        <i key={i} className={i === step ? 'on' : ''} />
+      ))}
+    </div>
+  );
+}

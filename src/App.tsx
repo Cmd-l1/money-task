@@ -1,8 +1,10 @@
 import { useEffect, useState, useSyncExternalStore, type ReactElement } from 'react';
 import { api, bump, getSession, getVersion, subscribe } from './lib/api';
 import { matchRoute, navigate, usePath, type Params } from './lib/router';
-import { ToastHost } from './ui/kit';
-import { About, AllSet, ChildLogin, ConfirmEmail, Consent, DemoPicker, NewPassword, FamilyInfo, Forgot, ForgotSent, Goal, ParentLogin, ParentSignup } from './screens/auth/Auth';
+import { Button, ToastHost } from './ui/kit';
+import { Icon } from './ui/Icon';
+import { Intro, introSeen } from './screens/auth/Intro';
+import { About, AllSet, LegalPage, ChildLogin, ConfirmEmail, Consent, DemoPicker, NewPassword, FamilyInfo, Forgot, ForgotSent, Goal, ParentLogin, ParentSignup } from './screens/auth/Auth';
 import { KidAchievements, KidDoTask, KidHome, KidProfile, KidRedeemed, KidSent, KidShop, KidStatement } from './screens/kid/Kid';
 import { Learn, Lesson, Quiz, QuizResultScreen, Review } from './screens/kid/Learn';
 import { AddMember, Approvals, EditMember, FollowChild, Members, ParentHome, ParentProfile, ParentRewards, ParentTasks, Privacy, Reject, Reports, RewardForm, TaskForm } from './screens/parent/Parent';
@@ -21,7 +23,10 @@ const ROUTES: { path: string; access: Access; render: (p: Params) => ReactElemen
   { path: '/nova-senha', access: 'public', render: () => <NewPassword /> },
   { path: '/filho/entrar', access: 'public', render: () => <ChildLogin /> },
   { path: '/demo', access: 'public', render: () => <DemoPicker /> },
+  { path: '/bem-vindo', access: 'public', render: () => <Intro /> },
   { path: '/sobre', access: 'public', render: () => <About /> },
+  { path: '/politica', access: 'public', render: () => <LegalPage kind="politica" /> },
+  { path: '/termos', access: 'public', render: () => <LegalPage kind="termos" /> },
 
   { path: '/pai', access: 'parent', render: () => <ParentHome /> },
   { path: '/pai/membros', access: 'parent', render: () => <Members /> },
@@ -57,6 +62,25 @@ const ROUTES: { path: string; access: Access; render: (p: Params) => ReactElemen
 ];
 import { KidTasks as KidTaskList } from './screens/kid/Kid';
 
+function NoConnection() {
+  return (
+    <div className="screen" style={{ justifyContent: 'center' }}>
+      <div className="hero">
+        <div className="halo">
+          <div>
+            <Icon name="wifioff" size={48} />
+          </div>
+        </div>
+        <h1 className="t-l">Sem internet</h1>
+        <p className="muted t-body">Confira sua conexão e tente de novo.</p>
+      </div>
+      <div className="footer-actions">
+        <Button onClick={() => { if (navigator.onLine) bump(); }}>Tentar de novo</Button>
+      </div>
+    </div>
+  );
+}
+
 export function App() {
   const path = usePath();
   useSyncExternalStore(subscribe, getVersion);
@@ -88,7 +112,7 @@ export function App() {
   let content: ReactElement | null = null;
   let redirect: string | null = null;
 
-  if (path === '/' || path === '') redirect = s ? (s.role === 'parent' ? '/pai' : '/filho') : '/entrar';
+  if (path === '/' || path === '') redirect = s ? (s.role === 'parent' ? '/pai' : '/filho') : introSeen() ? '/entrar' : '/bem-vindo';
   else {
     for (const r of ROUTES) {
       const m = matchRoute(r.path, path);
@@ -106,14 +130,14 @@ export function App() {
 
   return (
     <div className="app">
-      {!online && <div className="offline-bar">Sem conexão. Alguns recursos podem não funcionar.</div>}
+      {!online && !isReal && <div className="offline-bar">Sem conexão. Alguns recursos podem não funcionar.</div>}
       {s?.mode === 'demo' && (
         <div className="demo-bar">
           <span>Modo demonstração · dados fictícios</span>
           <button onClick={() => { void api.logout(); navigate('/entrar', true); }}>Sair</button>
         </div>
       )}
-      {content}
+      {!online && isReal ? <NoConnection /> : content}
       <ToastHost />
     </div>
   );
