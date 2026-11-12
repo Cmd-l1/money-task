@@ -1,7 +1,7 @@
-import { useState, type CSSProperties, type ReactNode } from 'react';
+import { useState } from 'react';
 import { api, getSession, sbConfigured } from '../../lib/api';
 import { navigate } from '../../lib/router';
-import { Alert, Button, Chip, Field, PasswordInput, Sheet, TextInput, TopBar, toast } from '../../ui/kit';
+import { Alert, Button, Field, PasswordInput, TextInput, TopBar, toast } from '../../ui/kit';
 import { Icon } from '../../ui/Icon';
 
 // Contas reais (Supabase) ficam ativas quando o build recebe o endereço e a chave do projeto.
@@ -9,32 +9,6 @@ const REAL_ACCOUNTS = sbConfigured;
 
 // Dados do cadastro em andamento (a senha fica só na memória, nunca no armazenamento do navegador).
 let signupDraft: { name: string; email: string; pass: string } | null = null;
-
-// Cartão colado na base da tela (como no Figma): raio 24 só no topo, sem margem lateral.
-const sheetCard: CSSProperties = { margin: 0, borderRadius: '24px 24px 0 0', borderWidth: '1px 0 0', padding: '24px 20px calc(env(safe-area-inset-bottom) + 32px)', marginTop: 'auto' };
-const flushScreen: CSSProperties = { padding: 0, gap: 0 };
-const linkWhite: CSSProperties = { fontWeight: 600, color: 'var(--foreground)', fontSize: 13 };
-
-// Faixa de erro só com a mensagem (sem título).
-function ErrorStrip({ children }: { children: ReactNode }) {
-  return (
-    <div className="alert destructive" role="alert" style={{ padding: '12px 14px' }}>
-      <span className="alert-icon"><Icon name="alert" size={18} /></span>
-      <div className="alert-body"><span className="alert-desc">{children}</span></div>
-    </div>
-  );
-}
-
-// Indicador de progresso em pílulas (passo atual mais largo).
-function Steps({ active, total = 3 }: { active: number; total?: number }) {
-  return (
-    <div className="row" style={{ gap: 6, justifyContent: 'center' }} aria-hidden>
-      {Array.from({ length: total }, (_, i) => (
-        <i key={i} style={{ display: 'block', height: 6, width: i === active ? 28 : 10, borderRadius: 3, background: i === active ? 'var(--primary)' : 'var(--secondary)' }} />
-      ))}
-    </div>
-  );
-}
 
 const emailOk = (v: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v.trim());
 
@@ -69,14 +43,23 @@ export function ParentLogin() {
   };
 
   return (
-    <div className="screen" style={flushScreen}>
-      <div className="hero" style={{ padding: 'calc(env(safe-area-inset-top) + 48px) 20px 24px' }}>
+    <div className="screen" style={{ gap: 20 }}>
+      <div className="hero" style={{ paddingTop: 32 }}>
         <div className="brand">money task</div>
         <h1 className="t-l">Bem-vindo de volta</h1>
-        <p className="muted">Acompanhe a rotina dos seus filhos.</p>
+        <p className="muted">Acompanhe a rotina dos membros da sua família.</p>
       </div>
-      <div className="card col gap-16" style={sheetCard}>
-        {formErr && <ErrorStrip>{formErr}</ErrorStrip>}
+      {!REAL_ACCOUNTS && (
+        <Alert variant="promo" icon="info" title="Versão de demonstração">
+          Os dados reais ainda não estão ativos. Toque em “Explorar modo demonstração” para ver o app completo.
+        </Alert>
+      )}
+      <div className="card col gap-16" style={{ padding: 20 }}>
+        {formErr && (
+          <Alert variant="destructive" icon="alert" title="Não foi possível entrar">
+            {formErr}
+          </Alert>
+        )}
         <Field label="E-mail" error={err.email}>
           <TextInput type="email" inputMode="email" autoComplete="email" placeholder="seuemail@exemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} invalid={!!err.email} />
         </Field>
@@ -87,14 +70,14 @@ export function ParentLogin() {
           Esqueci minha senha
         </a>
         <Button disabled={busy} onClick={submit}>{busy ? 'Entrando…' : 'Entrar'}</Button>
-        <Button variant="outline" icon="play" onClick={() => navigate('/demo')} style={{ fontSize: 14 }}>
+        <Button variant="outline" icon="play" onClick={() => navigate('/demo')}>
           Explorar modo demonstração
         </Button>
-        <p className="sep-text" style={linkWhite}>
-          Ainda não tem conta? <a href="#/cadastro" style={{ color: 'inherit' }}>Criar conta</a>
+        <p className="sep-text">
+          Ainda não tem conta? <a href="#/cadastro">Criar conta</a>
         </p>
         <p className="sep-text muted t-cap">
-          É filho(a)? <a href="#/filho/entrar" style={{ color: 'inherit' }}>Entrar com usuário e senha</a>
+          É filho(a)? <a href="#/filho/entrar">Entrar com usuário e senha</a>
         </p>
       </div>
     </div>
@@ -119,13 +102,13 @@ export function ParentSignup() {
   };
 
   return (
-    <div className="screen" style={flushScreen}>
-      <div className="hero" style={{ padding: 'calc(env(safe-area-inset-top) + 24px) 20px 20px' }}>
+    <div className="screen" style={{ gap: 16 }}>
+      <div className="hero" style={{ paddingTop: 16 }}>
         <div className="brand">money task</div>
         <h1 className="t-l">Crie sua conta</h1>
-        <p className="muted">Cadastro exclusivo para pais e responsáveis.</p>
+        <p className="muted">Cadastro exclusivo para responsáveis.</p>
       </div>
-      <div className="card col gap-16" style={sheetCard}>
+      <div className="card col gap-16" style={{ padding: 20 }}>
         <Field label="Nome completo" error={err.name}>
           <TextInput autoComplete="name" placeholder="Seu nome" value={f.name} onChange={(e) => set('name', e.target.value)} invalid={!!err.name} />
         </Field>
@@ -139,13 +122,12 @@ export function ParentSignup() {
           <PasswordInput autoComplete="new-password" placeholder="Repita a senha" value={f.pass2} onChange={(e) => set('pass2', e.target.value)} />
         </Field>
         <Button onClick={submit}>Continuar</Button>
-        <p className="sep-text" style={linkWhite}>
-          Já tem conta? <a href="#/entrar" style={{ color: 'inherit' }}>Entrar</a>
+        <p className="sep-text">
+          Já tem conta? <a href="#/entrar">Entrar</a>
         </p>
-        <div className="row" style={{ alignItems: 'flex-start', gap: 8 }}>
-          <span className="mint" style={{ flex: 'none', marginTop: 1 }}><Icon name="info" size={16} /></span>
-          <span className="t-cap muted">Seus filhos não criam conta: você cadastra o usuário e a senha deles depois, na aba Membros.</span>
-        </div>
+        <Alert icon="info" title="Os membros não criam conta">
+          Você cadastra o usuário e a senha deles depois, na aba Membros.
+        </Alert>
       </div>
     </div>
   );
@@ -172,39 +154,31 @@ export function Consent() {
   };
   return (
     <div className="screen pad-bottom-actions">
-      <div className="hero" style={{ paddingTop: 24 }}>
-        <div style={{ width: 80, height: 80, borderRadius: '50%', background: 'var(--card)', color: 'var(--primary)', display: 'grid', placeItems: 'center' }}>
-          <Icon name="shield" size={36} />
+      <TopBar title="Privacidade e consentimento" />
+      <div className="card col gap-16">
+        <h2 className="t-h">Os membros da família são menores de idade</h2>
+        <p className="muted">
+          Pela LGPD (Lei nº 13.709/2018), o tratamento de dados de crianças e adolescentes exige o consentimento de um responsável legal. Por isso pedimos sua autorização.
+        </p>
+        <hr className="divider" />
+        <div className="col" style={{ gap: 10 }}>
+          <b className="t-label">O que guardamos sobre cada membro</b>
+          {['Nome e idade', 'Nome de usuário e senha (protegida)', 'XP, tarefas, fotos de prova e resgates'].map((t) => (
+            <div key={t} className="row" style={{ gap: 10 }}>
+              <span className="mint"><Icon name="check" size={16} /></span>
+              <span className="muted">{t}</span>
+            </div>
+          ))}
         </div>
-        <h1 className="t-l">Privacidade dos seus filhos</h1>
-        <p className="muted">Para criar perfis de crianças e adolescentes, precisamos do seu consentimento (LGPD, art. 14).</p>
+        <hr className="divider" />
+        <p className="muted t-cap">
+          Usamos esses dados só para o app funcionar. Você pode baixar ou excluir tudo quando quiser, em Perfil &gt; Privacidade e dados.
+        </p>
       </div>
-      <div className="card col" style={{ gap: 12 }}>
-        {[
-          'Guardamos só nome, idade e usuário do seu filho.',
-          'Não pedimos e-mail, foto ou localização.',
-          'Só você vê e altera os dados e a senha dele.',
-          'Você pode apagar o perfil a qualquer momento.',
-        ].map((t) => (
-          <div key={t} className="row" style={{ gap: 10, alignItems: 'flex-start' }}>
-            <span className="mint" style={{ flex: 'none', marginTop: 1 }}><Icon name="check" size={16} /></span>
-            <span className="t-cap">{t}</span>
-          </div>
-        ))}
-      </div>
-      <div className="row" style={{ alignItems: 'flex-start', cursor: 'pointer' }} onClick={() => setOk(!ok)}>
-        <button
-          type="button"
-          role="checkbox"
-          aria-checked={ok}
-          aria-label="Li e concordo"
-          onClick={(e) => { e.stopPropagation(); setOk(!ok); }}
-          style={{ width: 22, height: 22, borderRadius: 6, flex: 'none', display: 'grid', placeItems: 'center', background: ok ? 'var(--primary)' : 'transparent', border: ok ? '1.5px solid var(--primary)' : '1.5px solid var(--dim)', color: 'var(--primary-foreground)' }}
-        >
-          {ok && <Icon name="check" size={14} />}
-        </button>
-        <span className="t-cap">Li e concordo com a Política de Privacidade e sou o responsável legal pelos perfis que vou criar.</span>
-      </div>
+      <label className="card tight row" style={{ alignItems: 'flex-start', cursor: 'pointer' }}>
+        <input type="checkbox" checked={ok} onChange={(e) => setOk(e.target.checked)} style={{ width: 22, height: 22, accentColor: '#6ceba8', marginTop: 2 }} />
+        <span className="t-body">Sou o responsável legal e autorizo o tratamento dos dados dos membros da minha família para o uso do app.</span>
+      </label>
       {err && (
         <Alert variant="destructive" icon="alert" title="Não foi possível criar a conta">
           {err} <a href="#/cadastro">Voltar ao cadastro</a>
@@ -222,51 +196,28 @@ export function Consent() {
 let onboardGoals: string[] = [];
 export function Goal() {
   const [sel, setSel] = useState<string[]>([]);
-  const opts: { t: string; icon: string }[] = [
-    { t: 'Hábitos de estudo', icon: 'book' },
-    { t: 'Tarefas de casa', icon: 'home' },
-    { t: 'Cuidados pessoais', icon: 'heart' },
-    { t: 'Educação financeira', icon: 'coin' },
-  ];
+  const opts = ['Criar bons hábitos', 'Ajudar nas tarefas de casa', 'Ensinar a lidar com dinheiro', 'Incentivar os estudos'];
   const toggle = (o: string) => setSel(sel.includes(o) ? sel.filter((x) => x !== o) : [...sel, o]);
   return (
     <div className="screen pad-bottom-actions">
-      <div style={{ paddingTop: 8 }}><Steps active={0} /></div>
+      <TopBar title="Seu objetivo" />
       <div className="col">
-        <h2 className="t-l">O que você quer incentivar?</h2>
-        <p className="muted">Escolha quantos quiser. Vamos sugerir tarefas e recompensas com base nisso.</p>
+        <h2 className="t-l">O que você quer com o money task?</h2>
+        <p className="muted">Opcional. Ajuda a pesquisa do projeto e não muda o app.</p>
       </div>
-      <div className="col" style={{ gap: 12 }}>
-        {opts.map((o) => {
-          const on = sel.includes(o.t);
-          return (
-            <button key={o.t} className={`option ${on ? 'selected' : ''}`} onClick={() => toggle(o.t)} aria-pressed={on}>
-              <span className="tile" style={{ width: 40, height: 40 }}><Icon name={o.icon} size={20} /></span>
-              <span className="grow">{o.t}</span>
-              {on && <span className="mint"><Icon name="check" size={20} /></span>}
-            </button>
-          );
-        })}
+      <div className="col">
+        {opts.map((o) => (
+          <button key={o} className={`option ${sel.includes(o) ? 'selected' : ''}`} onClick={() => toggle(o)}>
+            <span className="letter">{sel.includes(o) ? <Icon name="check" size={14} /> : ''}</span>
+            {o}
+          </button>
+        ))}
       </div>
-      <p className="t-cap-s dim" style={{ textAlign: 'center' }}>Essas perguntas são opcionais e ajudam na pesquisa do projeto.</p>
       <div className="footer-actions">
         <Button onClick={() => { onboardGoals = sel; navigate('/sobre-familia'); }}>Continuar</Button>
-        <Button variant="ghost" style={{ color: 'var(--muted-foreground)', fontSize: 13, fontWeight: 600 }} onClick={() => { onboardGoals = []; navigate('/sobre-familia'); }}>
-          Pular por agora
+        <Button variant="ghost" onClick={() => { onboardGoals = []; navigate('/sobre-familia'); }}>
+          Pular
         </Button>
-      </div>
-    </div>
-  );
-}
-
-function ChipGroup({ label, opts, value, onChange }: { label: string; opts: string[]; value: string; onChange: (v: string) => void }) {
-  return (
-    <div className="col" style={{ gap: 8 }}>
-      <b className="t-h" style={{ fontSize: 15 }}>{label}</b>
-      <div className="chips">
-        {opts.map((o) => (
-          <Chip key={o} active={value === o} onClick={() => onChange(value === o ? '' : o)}>{o}</Chip>
-        ))}
       </div>
     </div>
   );
@@ -274,34 +225,20 @@ function ChipGroup({ label, opts, value, onChange }: { label: string; opts: stri
 
 export function FamilyInfo() {
   const [n, setN] = useState('');
-  const [age, setAge] = useState('');
-  const [edu, setEdu] = useState('');
-  const save = (full: boolean) => {
-    if (getSession()?.mode !== 'real') return;
-    const data: Record<string, unknown> = {};
-    if (onboardGoals.length) data.goals = onboardGoals;
-    if (full) {
-      if (n) data.kids_expected = n === '4+' ? '4' : n;
-      if (age) data.age_range = age;
-      if (edu) data.education = edu;
-    }
-    if (Object.keys(data).length) void api.saveOnboarding(data);
-  };
   return (
     <div className="screen pad-bottom-actions">
-      <div style={{ paddingTop: 8 }}><Steps active={1} /></div>
+      <TopBar title="Sobre sua família" />
       <div className="col">
-        <h2 className="t-l">Sobre sua família</h2>
-        <p className="muted">Opcional. Usamos para sugerir tarefas e para a pesquisa do projeto.</p>
+        <h2 className="t-l">Quantos membros vão usar o app?</h2>
+        <p className="muted">Opcional. Você pode adicionar quantos quiser depois.</p>
       </div>
-      <ChipGroup label="Quantos filhos?" opts={['1', '2', '3', '4+']} value={n} onChange={setN} />
-      <ChipGroup label="Faixa etária" opts={['7–10', '11–15', '16–18']} value={age} onChange={setAge} />
-      <ChipGroup label="Escolaridade" opts={['Médio', 'Superior', 'Pós']} value={edu} onChange={setEdu} />
-      <p className="t-cap-s dim" style={{ textAlign: 'center' }}>Nenhum dado pessoal é compartilhado. Pode pular.</p>
+      <Field label="Quantidade de membros">
+        <TextInput inputMode="numeric" placeholder="Ex.: 2" value={n} onChange={(e) => setN(e.target.value.replace(/\D/g, '').slice(0, 2))} />
+      </Field>
       <div className="footer-actions">
-        <Button onClick={() => { save(true); navigate('/pronto'); }}>Continuar</Button>
-        <Button variant="ghost" style={{ color: 'var(--muted-foreground)', fontSize: 13, fontWeight: 600 }} onClick={() => { save(false); navigate('/pronto'); }}>
-          Pular por agora
+        <Button onClick={() => { if (getSession()?.mode === 'real') void api.saveOnboarding({ goals: onboardGoals, kids_expected: n || null }); navigate('/pronto'); }}>Continuar</Button>
+        <Button variant="ghost" onClick={() => { if (getSession()?.mode === 'real' && onboardGoals.length) void api.saveOnboarding({ goals: onboardGoals }); navigate('/pronto'); }}>
+          Pular
         </Button>
       </div>
     </div>
@@ -309,37 +246,25 @@ export function FamilyInfo() {
 }
 
 export function AllSet() {
-  const real = REAL_ACCOUNTS && getSession()?.mode === 'real';
-  const steps: { icon: string; t: string; sub: string; to: string }[] = [
-    { icon: 'users', t: '1. Adicione seu filho', sub: 'Cadastre o usuário e a senha dele.', to: '/pai/membros/novo' },
-    { icon: 'list', t: '2. Crie tarefas', sub: 'Defina o que vale XP.', to: '/pai/tarefas/nova' },
-    { icon: 'gift', t: '3. Crie recompensas', sub: 'Escolha prêmios para trocar por XP.', to: '/pai/recompensas/nova' },
-  ];
   return (
     <div className="screen pad-bottom-actions">
-      <div className="hero" style={{ paddingTop: 32 }}>
+      <div className="hero" style={{ paddingTop: 80 }}>
         <div className="halo">
           <div>
             <Icon name="check" size={44} />
           </div>
         </div>
         <h1 className="t-l">Tudo pronto!</h1>
-        <p className="muted">Siga estes 3 passos para começar:</p>
+        <p className="muted">Sua conta está criada. Agora adicione o primeiro membro da família.</p>
       </div>
-      <div className="col" style={{ gap: 12 }}>
-        {steps.map((st) => (
-          <button key={st.t} className="card tight clickable row" style={{ textAlign: 'left', width: '100%' }} disabled={!real} onClick={() => navigate(st.to, true)}>
-            <span className="tile"><Icon name={st.icon} size={22} /></span>
-            <span className="col grow" style={{ gap: 0 }}>
-              <b className="t-h" style={{ fontSize: 15 }}>{st.t}</b>
-              <span className="muted t-cap">{st.sub}</span>
-            </span>
-          </button>
-        ))}
-      </div>
+      {!(REAL_ACCOUNTS && getSession()?.mode === 'real') && (
+        <Alert variant="warning" icon="info" title="Contas reais em breve">
+          Nesta versão, o cadastro ainda não é gravado. Explore a demonstração para ver como tudo funciona.
+        </Alert>
+      )}
       <div className="footer-actions">
-        {real ? (
-          <Button onClick={() => navigate('/pai', true)}>Ir para o início</Button>
+        {REAL_ACCOUNTS && getSession()?.mode === 'real' ? (
+          <Button icon="plus" onClick={() => navigate('/pai/membros/novo', true)}>Adicionar primeiro membro</Button>
         ) : (
           <>
             <Button onClick={() => navigate('/demo')}>Explorar a demonstração</Button>
@@ -348,6 +273,7 @@ export function AllSet() {
             </Button>
           </>
         )}
+        {REAL_ACCOUNTS && getSession()?.mode === 'real' && <Button variant="ghost" onClick={() => navigate('/pai', true)}>Ir para o início</Button>}
       </div>
     </div>
   );
@@ -359,12 +285,17 @@ export function Forgot() {
   const [busy, setBusy] = useState(false);
   return (
     <div className="screen pad-bottom-actions">
-      <TopBar title="Recuperar senha" />
-      <p className="muted">Informe seu e-mail e enviaremos um link para criar uma nova senha.</p>
+      <TopBar title="Esqueci minha senha" />
+      <div className="col">
+        <h2 className="t-l">Vamos redefinir sua senha</h2>
+        <p className="muted">Digite o e-mail da sua conta e enviaremos um link para criar uma nova senha.</p>
+      </div>
       <Field label="E-mail" error={err}>
         <TextInput type="email" inputMode="email" placeholder="seuemail@exemplo.com" value={email} onChange={(e) => setEmail(e.target.value)} invalid={!!err} />
       </Field>
-      <p className="t-cap dim">A senha do seu filho não é recuperada por e-mail. Você mesmo a redefine em Membros.</p>
+      <Alert icon="info" title="Um membro esqueceu a senha?">
+        Ele não recebe link: você redefine em Membros &gt; Editar membro.
+      </Alert>
       <div className="footer-actions">
         <Button
           disabled={busy}
@@ -397,16 +328,21 @@ export function ForgotSent() {
   return (
     <div className="screen pad-bottom-actions">
       <div className="hero" style={{ paddingTop: 80 }}>
-        <div className="halo" style={{ width: 140, height: 140 }}>
-          <div style={{ width: 96, height: 96 }}>
+        <div className="halo">
+          <div>
             <Icon name="mail" size={40} />
           </div>
         </div>
         <h1 className="t-l">Confira seu e-mail</h1>
         <p className="muted">
-          Enviamos o link para <b>{email}</b>. Ele vale por 1 hora.
+          {REAL_ACCOUNTS ? <>Se existir uma conta com <b>{email}</b>, enviamos um link para criar uma nova senha. Ele vale por 1 hora. Veja também a caixa de spam.</> : <>Enviaríamos o link para <b>{email}</b>. Ele valeria por 1 hora.</>}
         </p>
       </div>
+      {!REAL_ACCOUNTS && (
+        <Alert variant="warning" icon="info" title="Recurso das contas reais">
+          O envio de e-mails será ativado junto com as contas reais.
+        </Alert>
+      )}
       <div className="footer-actions">
         <Button
           variant="outline"
@@ -448,23 +384,30 @@ export function ChildLogin() {
     }
   };
   return (
-    <div className="screen" style={flushScreen}>
-      <div className="row between" style={{ padding: 'calc(env(safe-area-inset-top) + 40px) 20px 24px' }}>
+    <div className="screen" style={{ gap: 20 }}>
+      <div className="row between" style={{ paddingTop: 24 }}>
         <h1 className="t-xl">Pronto para ganhar XP?</h1>
         <div className="xp-bubble">XP</div>
       </div>
-      <div className="card col gap-16" style={sheetCard}>
-        {error && <ErrorStrip>{error}</ErrorStrip>}
+      <div className="card col gap-16" style={{ padding: 20 }}>
+        {error && (
+          <Alert variant="destructive" icon="alert" title="Não foi possível entrar">
+            {error}
+          </Alert>
+        )}
         <Field label="Usuário">
-          <TextInput autoCapitalize="none" autoCorrect="off" autoComplete="username" placeholder="ex.: lucas14" value={u} onChange={(e) => setU(e.target.value)} invalid={!!error} style={error ? { borderWidth: 1.5 } : undefined} />
+          <TextInput autoCapitalize="none" autoCorrect="off" autoComplete="username" placeholder="ex.: lucas14" value={u} onChange={(e) => setU(e.target.value)} invalid={!!error} />
         </Field>
         <Field label="Senha">
-          <PasswordInput autoComplete="current-password" placeholder="••••••••" value={p} onChange={(e) => setP(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} style={error ? { border: '1.5px solid var(--destructive)' } : undefined} />
+          <PasswordInput autoComplete="current-password" placeholder="Sua senha" value={p} onChange={(e) => setP(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && submit()} />
         </Field>
         <Button disabled={busy} onClick={submit}>{busy ? 'Entrando…' : 'Entrar'}</Button>
         <p className="sep-text muted t-cap">Seu usuário e senha foram criados pelo seu responsável. Esqueceu? Peça a ele para redefinir.</p>
+        <Alert variant="promo" icon="info" title="Testando a demonstração?">
+          Use <b>lucas14</b> e senha <b>lucas123</b> (14 anos) ou <b>pedro17</b> e <b>pedro123</b> (17 anos, com educação financeira).
+        </Alert>
         <p className="sep-text muted t-cap">
-          É pai, mãe ou responsável? <a href="#/entrar" style={{ color: 'inherit', fontWeight: 600 }}>Entrar aqui</a>
+          É responsável? <a href="#/entrar">Entrar aqui</a>
         </p>
       </div>
     </div>
@@ -551,14 +494,14 @@ export function DemoPicker() {
   return (
     <div className="screen">
       <TopBar title="Modo demonstração" onBack={() => navigate('/entrar')} />
-      <p className="muted">Escolha como explorar o app. Os dados são fictícios e nada é salvo.</p>
+      <p className="muted">Escolha como explorar o app. Os dados são fictícios e ficam só neste aparelho.</p>
       <Item icon="user" title="Entrar como responsável" sub="Veja aprovações, tarefas e membros." onClick={() => go('parent')} />
-      <Item icon="gamepad" title="Entrar como filho · 9 anos" sub="Tarefas, loja e conquistas." onClick={() => go('kid', 'c-mari')} />
-      <Item icon="book" title="Entrar como filho · 17 anos" sub="Inclui a trilha de educação financeira." onClick={() => go('kid', 'c-pedro')} />
+      <Item icon="gamepad" title="Entrar como membro · 9 anos" sub="Tarefas, loja e conquistas." onClick={() => go('kid', 'c-mari')} />
+      <Item icon="book" title="Entrar como membro · 17 anos" sub="Inclui a trilha de educação financeira." onClick={() => go('kid', 'c-pedro')} />
       <Alert variant="promo" icon="star" title="Gostou do money task?">
-        <span>Crie sua conta grátis e acompanhe a rotina de verdade com seus filhos.</span>
+        <span>Crie sua conta grátis e acompanhe a rotina de verdade com os membros da sua família.</span>
         <span style={{ display: 'block', marginTop: 10 }}>
-          <Button onClick={() => navigate('/cadastro')}>
+          <Button small onClick={() => navigate('/cadastro')}>
             Criar conta grátis
           </Button>
         </span>
@@ -568,47 +511,23 @@ export function DemoPicker() {
 }
 
 export function About() {
-  const [doc, setDoc] = useState<'privacy' | 'terms' | null>(null);
-  const rows: { k: 'privacy' | 'terms'; t: string }[] = [
-    { k: 'privacy', t: 'Política de Privacidade' },
-    { k: 'terms', t: 'Termos de uso' },
-  ];
   return (
     <div className="screen">
       <TopBar title="Sobre o money task" />
       <div className="hero">
-        <div className="brand">money task</div>
-        <span className="muted t-cap">Versão {import.meta.env.VITE_APP_VERSION || '1.0'}</span>
-        <p className="muted">Um app para transformar a rotina da família em jogo: tarefas viram XP e o XP vira recompensa, com educação financeira para os mais velhos.</p>
-        <span className="dim t-cap">Projeto de TCC · Design · FURB</span>
+        <div className="xp-bubble">XP</div>
+        <h2 className="t-l">money task</h2>
+        <p className="muted">Tarefas, XP e educação financeira para famílias.</p>
       </div>
-      <div className="card menu">
-        {rows.map((r) => (
-          <button key={r.k} className="list-item" onClick={() => setDoc(r.k)}>
-            <span className="label">{r.t}</span>
-            <Icon name="chevron" size={18} className="chev" />
-          </button>
-        ))}
+      <div className="card col">
+        <p className="muted">Projeto de conclusão de curso (Design, FURB). Responsáveis criam tarefas e recompensas, e os membros ganham XP ao concluir e trocam por prêmios combinados em família.</p>
+        <hr className="divider" />
+        <div className="row-kv"><span className="muted">Versão</span><b>{import.meta.env.VITE_APP_VERSION || 'dev'}</b></div>
+        <div className="row-kv"><span className="muted">Faixa etária</span><b>7 a 18 anos</b></div>
       </div>
       <p className="muted t-cap center" style={{ textAlign: 'center' }}>
         Conteúdo de educação financeira baseado em materiais do Banco Central (Cidadania Financeira), ANBIMA Educação e ENEF. É material educativo, não recomendação de investimento.
       </p>
-      <Sheet open={doc !== null} onClose={() => setDoc(null)}>
-        <h3 className="t-m">{doc === 'privacy' ? 'Política de Privacidade' : 'Termos de uso'}</h3>
-        {doc === 'privacy' ? (
-          <div className="col muted t-cap" style={{ gap: 10 }}>
-            <p>Guardamos só o necessário: nome, idade, usuário e senha (protegida) dos membros, além de XP, tarefas, fotos de prova e resgates.</p>
-            <p>Não pedimos e-mail, foto de perfil ou localização dos filhos. Só o responsável vê e altera os dados e a senha deles.</p>
-            <p>Você pode baixar ou excluir todos os dados quando quiser, em Perfil &gt; Privacidade e dados.</p>
-          </div>
-        ) : (
-          <div className="col muted t-cap" style={{ gap: 10 }}>
-            <p>O money task é um projeto acadêmico (TCC de Design, FURB) que ajuda famílias a organizar tarefas e recompensas.</p>
-            <p>O cadastro é exclusivo para pais e responsáveis, que respondem pelos perfis que criam. O conteúdo de educação financeira é educativo e não é recomendação de investimento.</p>
-          </div>
-        )}
-        <Button onClick={() => setDoc(null)}>Fechar</Button>
-      </Sheet>
     </div>
   );
 }
