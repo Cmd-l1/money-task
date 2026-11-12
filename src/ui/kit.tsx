@@ -45,18 +45,19 @@ export async function run(fn: () => Promise<unknown> | unknown, okMsg?: string):
 }
 
 // ---------- toast ----------
-let toastFn: ((m: string, k: 'ok' | 'error') => void) | null = null;
-export function toast(msg: string, kind: 'ok' | 'error' = 'ok') {
-  toastFn?.(msg, kind);
+let toastFn: ((m: string, k: 'ok' | 'error', title?: string) => void) | null = null;
+/** Com `title`, o aviso aparece em duas linhas (título em negrito + texto), como no Figma. */
+export function toast(msg: string, kind: 'ok' | 'error' = 'ok', title?: string) {
+  toastFn?.(msg, kind, title);
 }
 export function ToastHost() {
-  const [t, setT] = useState<{ m: string; k: 'ok' | 'error'; id: number } | null>(null);
+  const [t, setT] = useState<{ m: string; k: 'ok' | 'error'; id: number; title?: string } | null>(null);
   useEffect(() => {
     let id = 0;
-    toastFn = (m, k) => {
+    toastFn = (m, k, title) => {
       id++;
       const mine = id;
-      setT({ m, k, id: mine });
+      setT({ m, k, id: mine, title });
       setTimeout(() => setT((cur) => (cur && cur.id === mine ? null : cur)), 3200);
     };
     return () => {
@@ -66,8 +67,15 @@ export function ToastHost() {
   if (!t) return null;
   return (
     <div className={'toast ' + (t.k === 'error' ? 'error' : '')} role="status" aria-live="polite">
-      <Icon name={t.k === 'error' ? 'alert' : 'check'} size={18} />
-      <span>{t.m}</span>
+      <Icon name={t.k === 'error' ? 'alert' : 'check'} size={t.title ? 22 : 18} />
+      {t.title ? (
+        <span className="col" style={{ gap: 0 }}>
+          <b style={{ fontSize: 14, fontWeight: 700 }}>{t.title}</b>
+          <span style={{ fontSize: 13, fontWeight: 400 }}>{t.m}</span>
+        </span>
+      ) : (
+        <span>{t.m}</span>
+      )}
     </div>
   );
 }
@@ -187,12 +195,12 @@ export function Loading() {
 
 export function Empty({ icon, title, text, action }: { icon: string; title: string; text: string; action?: ReactNode }) {
   return (
-    <div className="card col center" style={{ padding: 24, gap: 12 }}>
+    <div className="card col center" style={{ padding: '28px 20px', gap: 12 }}>
       <div className="tile lg">
         <Icon name={icon} size={28} />
       </div>
       <h3 className="t-h">{title}</h3>
-      <p className="muted t-body">{text}</p>
+      <p className="muted t-cap">{text}</p>
       {action}
     </div>
   );
