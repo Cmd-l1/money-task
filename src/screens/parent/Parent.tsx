@@ -609,6 +609,7 @@ export function ParentProfile() {
       <div className="card menu">
         {row('shield', 'Privacidade e dados', '/pai/privacidade')}
         {row('chart', 'Relatórios', '/pai/relatorios')}
+        {row('play', 'Rever tutorial', '/pai/tutorial?de=perfil')}
         {row('info', 'Sobre o money task', '/sobre')}
       </div>
       <InstallBanner />

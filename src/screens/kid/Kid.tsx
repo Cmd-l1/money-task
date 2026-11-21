@@ -659,7 +659,6 @@ export function KidProfile() {
   const { data: me } = useData(() => api.me());
   const [out, setOut] = useState(false);
   if (!me) return <KidLayout active="perfil"><Loading /></KidLayout>;
-  const edu = me.age >= 16;
   const MenuItem = ({ icon, label, path }: { icon: string; label: string; path: string }) => (
     <button className="list-item" onClick={() => navigate(path)}>
       <div className="tile dark sm">
@@ -680,7 +679,8 @@ export function KidProfile() {
       <div className="card menu">
         <MenuItem icon="list" label="Meu extrato de XP" path="/filho/extrato" />
         <MenuItem icon="gift" label="Meus resgates" path="/filho/loja?tab=resgates" />
-        {edu ? <MenuItem icon="trophy" label="Minhas conquistas" path="/filho/conquistas" /> : <MenuItem icon="trophy" label="Minhas conquistas" path="/filho/conquistas" />}
+        <MenuItem icon="trophy" label="Minhas conquistas" path="/filho/conquistas" />
+        <MenuItem icon="play" label="Rever tutorial" path="/filho/tutorial?de=perfil" />
       </div>
       <p className="muted t-cap"><Icon name="info" size={13} /> Para trocar sua senha, peça ao seu responsável.</p>
       <InstallBanner />
