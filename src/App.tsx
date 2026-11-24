@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore, type ReactElement } from 're
 import { api, bump, getSession, getVersion, subscribe } from './lib/api';
 import { matchRoute, navigate, usePath, type Params } from './lib/router';
 import { ToastHost } from './ui/kit';
+import { Onboarding, seenOnboarding, tutorialPath } from './ui/Onboarding';
 import { About, AllSet, ChildLogin, ConfirmEmail, Consent, DemoPicker, NewPassword, FamilyInfo, Forgot, ForgotSent, Goal, ParentLogin, ParentSignup } from './screens/auth/Auth';
 import { KidAchievements, KidDoTask, KidHome, KidProfile, KidRedeemed, KidSent, KidShop, KidStatement } from './screens/kid/Kid';
 import { Learn, Lesson, Quiz, QuizResultScreen, Review } from './screens/kid/Learn';
@@ -39,6 +40,7 @@ const ROUTES: { path: string; access: Access; render: (p: Params) => ReactElemen
   { path: '/pai/perfil', access: 'parent', render: () => <ParentProfile /> },
   { path: '/pai/privacidade', access: 'parent', render: () => <Privacy /> },
   { path: '/pai/relatorios', access: 'parent', render: () => <Reports /> },
+  { path: '/pai/tutorial', access: 'parent', render: () => <Onboarding role="parent" /> },
 
   { path: '/filho', access: 'kid', render: () => <KidHome /> },
   { path: '/filho/tarefas', access: 'kid', render: () => <KidTaskList /> },
@@ -49,6 +51,7 @@ const ROUTES: { path: string; access: Access; render: (p: Params) => ReactElemen
   { path: '/filho/conquistas', access: 'kid', render: () => <KidAchievements /> },
   { path: '/filho/perfil', access: 'kid', render: () => <KidProfile /> },
   { path: '/filho/extrato', access: 'kid', render: () => <KidStatement /> },
+  { path: '/filho/tutorial', access: 'kid', render: () => <Onboarding role="kid" /> },
   { path: '/filho/aprender', access: 'kid', render: () => <Learn /> },
   { path: '/filho/aprender/:slug/prova', access: 'kid', render: (p) => <Quiz slug={p.slug} /> },
   { path: '/filho/aprender/:slug/resultado', access: 'kid', render: (p) => <QuizResultScreen slug={p.slug} /> },
@@ -100,6 +103,8 @@ export function App() {
     }
     if (!content && !redirect) redirect = '/';
   }
+  // primeiro acesso: abre o tutorial uma vez
+  if (!redirect && s && (path === '/pai' || path === '/filho') && !seenOnboarding(s)) redirect = tutorialPath(s.role);
   useEffect(() => {
     if (redirect) navigate(redirect, true);
   }, [redirect]);
