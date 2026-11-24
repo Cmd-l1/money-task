@@ -296,3 +296,9 @@ h1, h2, h3, p { margin: 0; }
 .onb-dots { display: flex; justify-content: center; gap: 8px; }
 .onb-dots span { width: 8px; height: 8px; border-radius: 50%; background: rgba(255, 255, 255, 0.25); transition: all .2s; }
 .onb-dots span.on { width: 24px; border-radius: 4px; background: var(--primary); }
+
+/* menus de perfil: texto nunca cortado em telas estreitas */
+.list-item { min-width: 0; }
+.list-item .label { min-width: 0; white-space: normal; overflow: visible; overflow-wrap: anywhere; line-height: 1.3; }
+.list-item svg { flex: none; }
+.menu .list-item { min-height: 56px; height: auto; }
