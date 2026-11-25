@@ -38,12 +38,12 @@ h1, h2, h3, p { margin: 0; }
 
 /* Moldura: no celular ocupa a tela; no desktop vira uma "tela de celular" centralizada */
 .app {
-  position: relative; height: 100%; max-width: 480px; margin: 0 auto;
+  position: relative; height: 100%; height: 100dvh; max-width: 480px; margin: 0 auto;
   background: var(--background); overflow: hidden; display: flex; flex-direction: column;
 }
 @media (min-width: 520px) { .app { height: min(900px, 100%); margin-top: max(0px, calc((100vh - 900px) / 2)); border-radius: 28px; border: 1px solid var(--border); } }
 .screen > * { flex-shrink: 0; }
-.screen { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; padding: calc(env(safe-area-inset-top) + 16px) 20px 24px; display: flex; flex-direction: column; gap: 16px; }
+.screen { flex: 1; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior-y: contain; touch-action: pan-y; overflow-x: hidden; padding: calc(env(safe-area-inset-top) + 16px) 20px 24px; display: flex; flex-direction: column; gap: 16px; }
 .screen.has-nav { padding-bottom: calc(var(--nav-h) + 24px); }
 .screen.pad-bottom-actions { padding-bottom: 96px; }
 .screen::-webkit-scrollbar { width: 0; }
